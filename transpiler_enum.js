@@ -33,12 +33,11 @@ const TokenType = {
 Object.freeze(TokenType);
 
 class Token{
-	constructor(type, word, args, capturedArgs = false, linenum = 0){
-		this.type         = type;
-		this.word         = word;
-    this.capturedArgs = capturedArgs;
-		this.args         = args;
-		this.linenum      = linenum;
+	constructor(type, word, args, linenum = 0){
+		this.type = type;
+		this.word = word;
+		this.args = args;
+		this.linenum = linenum;
 	}
 }
 
@@ -182,6 +181,25 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				tokens.push(new Token(constructing,word,[], linenum));
 				constructing = TokenType.NONE;
 				word = "";
+			}else if((line[i] === "&" && line[i+1] === "&") ||
+						   (line[i] === "|" && line[i+1] === "|")){
+				// Push previous token
+				if(word !== ""){
+					shoutToken(constructing,word);
+					tokens.push(new Token(constructing,word,[], linenum));
+					constructing = TokenType.NONE;
+					word = "";
+				}
+				// Make token
+				constructing = TokenType.EMPTYLOGIC;
+				word += line[i];
+				word += line[i+1];
+				// Push this token
+				shoutToken(constructing,word);
+				tokens.push(new Token(constructing,word,[], linenum));
+				constructing = TokenType.NONE;
+				word = "";
+				i++;
 			}else if(line[i] === ";"){
 				//discard semicolons
 			}else if(line[i]==="*" && line[i+1]==="/"){
