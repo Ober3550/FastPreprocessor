@@ -33,10 +33,10 @@ const TokenType = {
 Object.freeze(TokenType);
 
 class Token{
-	constructor(type, word, args, capturedArgs = false, linenum = 0){
+	constructor(type, word, args, uncaptured = true, linenum = 0){
 		this.type         = type;
 		this.word         = word;
-    this.capturedArgs = capturedArgs;
+    this.uncaptured   = uncaptured;
 		this.args         = args;
 		this.linenum      = linenum;
 	}
@@ -448,14 +448,14 @@ function divmulparse(tree, filename){
     }
 	}
 	for(let i=1;i<tree.length;i++){
-		if(tree[i].word === "*" && tree[i].args.length === 0){
+		if(tree[i].uncaptured && tree[i].word === "*"){
 			let subTokens = new Token(TokenType.MUL,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
-		if(tree[i].word === "/" && tree[i].args.length === 0){
+		if(tree[i].uncaptured && tree[i].word === "/"){
 			let subTokens = new Token(TokenType.DIV,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
@@ -476,14 +476,14 @@ function addsubparse(tree, filename){
     }
 	}
 	for(let i=1;i<tree.length-1;i++){
-		if(tree[i].word === "+" && tree[i].args.length === 0){
+		if(tree[i].uncaptured && tree[i].word === "+"){
 			let subTokens = new Token(TokenType.ADD,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
-		if(tree[i].word === "-" && tree[i].args.length === 0){
+		if(tree[i].uncaptured && tree[i].word === "-"){
 			let subTokens = new Token(TokenType.SUB,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
