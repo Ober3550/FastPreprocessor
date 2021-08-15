@@ -28,7 +28,18 @@ const TokenType = {
   COMMENT      : "comment",
   OPERATION    : "operation",
   COLLAPSE     : "collapse",
-  INCREMENT    : "increment"
+  INCREMENT    : "increment",
+  KEYBOOL      : "bool",
+  KEYCHAR      : "char",
+  KEYSHORT     : "short",
+  KEYINT       : "int",
+  KEYLONG      : "long",
+  KEYFLOAT     : "float",
+  KEYDOUBLE    : "double",
+  KEYVOID      : "void",
+  KEYCASE      : "case",
+  KEYBREAK     : "break",
+  KEYELSE      : "else"
 }
 Object.freeze(TokenType);
 
@@ -491,6 +502,23 @@ function addsubparse(tree, filename){
 			i--;
 		}
 	}
+}
+
+function isKeyword(token){
+  if(token == null)
+    return false;
+  return  token.type === TokenType.KEYBOOL    ||
+          token.type === TokenType.KEYCHAR    ||
+          token.type === TokenType.KEYSHORT   ||
+          token.type === TokenType.KEYINT     ||
+          token.type === TokenType.KEYLONG    ||
+          token.type === TokenType.KEYFLOAT   ||
+          token.type === TokenType.KEYDOUBLE  ||
+          token.type === TokenType.KEYVOID    ||
+          token.type === TokenType.KEYCASE    ||
+          token.type === TokenType.KEYBREAK   ||
+          token.type === TokenType.KEYELSE;
+
 }
 
 function checkCollapse(token){
