@@ -4,6 +4,7 @@ const process = require("process");
 
 const TokenType = {
   NONE         : "none",
+  CAPTURED     : false,
   KEYVALUE     : "keyvalue",
   EQUALITY     : "equality",
   ACCESSOR     : "accessor",
@@ -22,12 +23,11 @@ const TokenType = {
   NEWLINE      : "newline",
   MULTICOMMENT : "multicomment",
   STRING       : "string",
-  EMPTYLOGIC   : "emptylogic",
   VARIABLE     : "variable",
   NUMBER       : "number",
   COMMENT      : "comment",
   OPERATION    : "operation",
-  COLLAPSE     : "collapse",
+  POINTER      : "pointer",
   INCREMENT    : "increment",
   KEYBOOL      : "bool",
   KEYCHAR      : "char",
@@ -39,9 +39,24 @@ const TokenType = {
   KEYVOID      : "void",
   KEYCASE      : "case",
   KEYBREAK     : "break",
-  KEYELSE      : "else"
+  KEYELSE      : "else",
+  COLLAPSE     : "collapse"
 }
 Object.freeze(TokenType);
+
+const Keywords = {
+  "bool"       : TokenType.KEYBOOL, 
+  "char"       : TokenType.KEYCHAR, 
+  "short"      : TokenType.KEYSHORT, 
+  "int"        : TokenType.KEYINT,
+  "long"       : TokenType.KEYLONG,
+  "float"      : TokenType.KEYFLOAT, 
+  "double"     : TokenType.KEYDOUBLE,
+  "void"       : TokenType.KEYVOID,
+  "case"       : TokenType.KEYCASE, 
+  "break"      : TokenType.KEYBREAK, 
+  "else"       : TokenType.KEYELSE
+}
 
 class Token{
 	constructor(type, word, args, uncaptured = true, linenum = 0){
@@ -327,102 +342,98 @@ function compoundScopes(tree, parentNode, index, filename){
 		}
     if(i>0 && tree[i-1].word === "+" && tree[i].word === "+"){
       tree[i-1].word = "++";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "-" && tree[i].word === "-"){
       tree[i-1].word = "--";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
       tree[i-1].word = "+=";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "-" && tree[i].word === "="){
       tree[i-1].word = "-=";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
       tree[i-1].word = "+=";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "-" && tree[i].word === "="){
       tree[i-1].word = "-=";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
     }
     if(i>0 && tree[i-1].word === "!" && tree[i].word === "="){
       tree[i-1].word = "!=";
-      tree[i-1].type = TokenType.EMPTYLOGIC;
       tree.splice(i,1);
       i--;
+    }
+    if(Keywords[tree[i].word] != null){
+      tree[i].type = Keywords[tree[i].word];
     }
 	}
 	// Secondary pass to do more transformations after previous transforms
 	for(let i=0;i<tree.length;i++){
     // Not token
-    if(tree[i].word === "!" && tree[i].type !== TokenType.LOGIC){
-      let subTokens = new Token(TokenType.LOGIC,"!",[new Token(0,"",[]),tree[i+1]], tree[i].linenum);
+    if(tree[i].uncaptured && tree[i].word === "!"){
+      let subTokens = new Token(TokenType.LOGIC,"!",[new Token(0,"",[]),tree[i+1]], TokenType.CAPTURED, tree[i].linenum);
       tree.splice(i,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
     // Increment token
-    if(tree[i].word === "++" && tree[i].type !== TokenType.INCREMENT){
-      let subTokens = new Token(TokenType.INCREMENT,"++",[tree[i-1],new Token(0,"",[])], tree[i-1].linenum);
+    if(tree[i].uncaptured && tree[i].word === "++" && tree[i].type !== TokenType.INCREMENT){
+      let subTokens = new Token(TokenType.INCREMENT,"++",[tree[i-1],new Token(0,"",[])], TokenType.CAPTURED, tree[i-1].linenum);
       tree.splice(i-1,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
     // Decrement token
-    if(tree[i].word === "--" && tree[i].type !== TokenType.INCREMENT){
-      let subTokens = new Token(TokenType.INCREMENT,"--",[tree[i-1],new Token(0,"",[])], tree[i-1].linenum);
+    if(tree[i].uncaptured && tree[i].word === "--" && tree[i].type !== TokenType.INCREMENT){
+      let subTokens = new Token(TokenType.INCREMENT,"--",[tree[i-1],new Token(0,"",[])], TokenType.CAPTURED, tree[i-1].linenum);
       tree.splice(i-1,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
 		// Convert inequalities
-		if(tree[i].word === "!=" && tree[i].type !== TokenType.EQUALITY){
+		if(tree[i].uncaptured && tree[i].word === "!=" && tree[i].type !== TokenType.EQUALITY){
       console.log(tree[i-2],tree[i-2],tree[i]);
-			let subTokens = new Token(TokenType.EQUALITY,"!=",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+			let subTokens = new Token(TokenType.EQUALITY,"!=",[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert equalities
-		if(tree[i].word === "==" && tree[i].type !== TokenType.EQUALITY){
-			let subTokens = new Token(TokenType.EQUALITY,"==",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+		if(tree[i].uncaptured && tree[i].word === "==" && tree[i].type !== TokenType.EQUALITY){
+			let subTokens = new Token(TokenType.EQUALITY,"==",[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
     // Convert keyvalues
-    if(tree[i].word === ":" && tree[i].type !== TokenType.KEYVALUE){
-      let subTokens = new Token(TokenType.KEYVALUE,":",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+    if(tree[i].uncaptured && tree[i].word === ":" && tree[i].type !== TokenType.KEYVALUE){
+      let subTokens = new Token(TokenType.KEYVALUE,":",[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
       tree.splice(i-1,3,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
 		// Convert logic
-		if(tree[i].type === TokenType.EMPTYLOGIC){
-			let subTokens = new Token(TokenType.LOGIC,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum);
+		if(tree[i].uncaptured && tree[i].type === TokenType.EMPTYLOGIC){
+			let subTokens = new Token(TokenType.LOGIC,tree[i].word,[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert assignments
-		if((tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=") && tree[i].type !== TokenType.ASSIGNMENT){
-			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+		if(tree[i].uncaptured && (tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=") && tree[i].type !== TokenType.ASSIGNMENT){
+			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
@@ -439,7 +450,7 @@ function compoundScopes(tree, parentNode, index, filename){
 				console.log(tree[i-1]);
 				console.log(tree[i+1]);
 			}
-			let subTokens = new Token(TokenType.RANGE,tree[i].word,[tree[i-1],tree[i+1]]);
+			let subTokens = new Token(TokenType.RANGE,tree[i].word,[tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
@@ -459,17 +470,19 @@ function divmulparse(tree, filename){
     }
 	}
 	for(let i=1;i<tree.length;i++){
-		if(tree[i].uncaptured && tree[i].word === "*"){
-			let subTokens = new Token(TokenType.MUL,tree[i].word,[]);
-			subTokens.args.push(tree[i-1]);
-			subTokens.args.push(tree[i+1]);
-			tree.splice(i-1,3,subTokens);
-			i--;
-		}
+    if(tree[i].uncaptured && tree[i].word === "*"){
+      if(!isKeyword(tree[i-1])){
+        let subTokens = new Token(TokenType.MUL, tree[i].word, [tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
+        tree.splice(i-1,3,subTokens);
+        i--;
+      }else{
+        let subTokens = new Token(TokenType.POINTER, tree[i].word, [tree[i+1]], TokenType.CAPTURED, tree[i+1].linenum);
+        tree.splice(i,2,subTokens);
+        i--;
+      }
+    }
 		if(tree[i].uncaptured && tree[i].word === "/"){
-			let subTokens = new Token(TokenType.DIV,tree[i].word,[]);
-			subTokens.args.push(tree[i-1]);
-			subTokens.args.push(tree[i+1]);
+			let subTokens = new Token(TokenType.DIV,tree[i].word, [tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
@@ -488,16 +501,12 @@ function addsubparse(tree, filename){
 	}
 	for(let i=1;i<tree.length-1;i++){
 		if(tree[i].uncaptured && tree[i].word === "+"){
-			let subTokens = new Token(TokenType.ADD,tree[i].word,[]);
-			subTokens.args.push(tree[i-1]);
-			subTokens.args.push(tree[i+1]);
+			let subTokens = new Token(TokenType.ADD,tree[i].word, [tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
 		if(tree[i].uncaptured && tree[i].word === "-"){
-			let subTokens = new Token(TokenType.SUB,tree[i].word,[]);
-			subTokens.args.push(tree[i-1]);
-			subTokens.args.push(tree[i+1]);
+			let subTokens = new Token(TokenType.SUB,tree[i].word, [tree[i-1],tree[i+1]], TokenType.CAPTURED, tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
