@@ -2,6 +2,36 @@ const fs = require("fs");
 const util = require("util");
 const process = require("process");
 
+const TokenType = {
+  NONE         : 0,
+  KEYVALUE     : 1,
+  EQUALITY     : 2,
+  ACCESSOR     : 3,
+  ASSIGNMENT   : 4,
+  RANGE        : 5,
+  FUNCTIONDECL : 6,
+  FUNCTIONCALL : 7,
+  SCOPE        : 8,
+  ARGS         : 9,
+  ARRAY        : 10,
+  LOGIC        : 11,
+  MUL          : 12,
+  DIV          : 13,
+  SUB          : 14,
+  ADD          : 15,
+  NEWLINE      : 16,
+  MULTICOMMENT : 17,
+  STRING       : 18,
+  EMPTYLOGIC   : 19,
+  VARIABLE     : 20,
+  NUMBER       : 21,
+  COMMENT      : 22,
+  OPERATION    : 23,
+  COLLAPSE     : 24,
+  INCREMENT    : 25
+}
+Object.freeze(TokenType);
+
 class Token{
 	constructor(type, word, args, linenum = 0){
 		this.type = type;
@@ -37,66 +67,53 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
   	if(lines % 1000 === 0)
   		console.log("Processed "+lines+" lines");
 	let i=0;
-	let constructing = "none";
+	let constructing = TokenType.NONE;
 	let word = "";
 	while(i < line.length){
 
 		// MULTILINE TOKEN HANDLING
-
-		if(multilineToken.type === "multicomment"){
-			// Add character to string
-			multilineToken.word += line[i];
-			// Get last index
-			let last = multilineToken.word.length-1;
-			if(multilineToken.word[last-1] === "*" && multilineToken.word[last] === "/"){
-				// Make token
-				constructing = multilineToken.type;
-				word = multilineToken.word;
-				multilineToken.type = "none";
-				multilineToken.word = "";
-
-				// Push this token
-				shoutToken(constructing,word);
-				tokens.push(new Token(constructing,word,[], linenum));
-				constructing = "none";
-				word = "";
+		if(multilineToken.type === TokenType.MULTICOMMENT){
+      let closedMultiline = false;
+      while(i < line.length){
+        multilineToken.word += line[i];
+        // Check for close comment
+        if(line[i] === "/" && line[i-1] === "*"){
+          closedMultiline = true;
+          break;
+        }
+        i++;
+      }
+			if(closedMultiline){
+				shoutToken(multilineToken.type, multilineToken.word);
+        tokens.push(new Token(multilineToken.type,multilineToken.word,[],linenum));
+        multilineToken.type = TokenType.NONE;
+        multilineToken.word = "";
+        constructing = TokenType.NONE;
+        word = "";
 			}else{
-				if(i===line.length-1)
-					multilineToken.word += "\n";
+        multilineToken.word += "\n";
 			}
-		}else if(multilineToken.type === "string"){
+		}else if(multilineToken.type === TokenType.STRING){
+      let closedMultiline = false;
 			// Make string token
 			while(i < line.length){
 				multilineToken.word += line[i];
 				// Check that starting quote type (',") matches closing type
-				if(line[i] === multilineToken.stringType) {
-					// Escaped quote check
-					let triple = (i - 1 >= 0) ? line[i - 1] : "";
-					triple += line[i];
-					triple += (i + 1 < line.length) ? line[i + 1] : "";
-					if (triple !== '&";'){
-						break;
-					}else{
-						// Replace escaped quote with normal escaped quote
-						multilineToken.word = multilineToken.word.slice(0,multilineToken.word.length-2);
-						multilineToken.word += "\\\"";
-						i++;
-					}
+				if(line[i] === multilineToken.stringType && line[i-1] !== "\\") {
+          closedMultiline = true;
+          break;
 				}
 				i++;
 			}
-			// Check that starting quote type (',") matches closing type
-			if(line[i] === multilineToken.stringType){
-				// Make token
-				constructing = multilineToken.type;
-				word = multilineToken.word;
-				multilineToken.word = "";
-				multilineToken.type = "none";
-				// Push this token
-				shoutToken(constructing, word);
-				tokens.push(new Token(constructing, word, [], linenum));
-				constructing = "none";
-				word = "";
+			if(closedMultiline){
+        shoutToken(multilineToken.type, multilineToken.word);
+        tokens.push(new Token(multilineToken.type,multilineToken.word,[],linenum));
+        multilineToken.type = TokenType.NONE;
+        multilineToken.word = "";
+        constructing = TokenType.NONE;
+        word = "";
+			}else{
+        multilineToken.word += "\n";
 			}
 
 		// END MULTILINE TOKEN HANDLING
@@ -107,26 +124,26 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				// Move handling to multiline code
 				// (reduces duplicate code by having both single and multiline strings handled in same way)
 				multilineToken.word += line[i];
-				multilineToken.type = "string";
+				multilineToken.type = TokenType.STRING;
 				multilineToken.stringType = line[i];
 			}else if(line[i] === "/" && line[i+1] === "*"){
 				// Move handling to multiline code
 				// (reduces duplicate code by having both single and multiline comments handled in same way)
-				multilineToken.type = "multicomment";
+				multilineToken.type = TokenType.MULTICOMMENT;
 				multilineToken.word += line[i];
 			}
 			// If lowercase or uppercase letters
 			else if((c >= "a".charCodeAt(0) && c <= "z".charCodeAt(0) ) ||
 				      (c >= "A".charCodeAt(0) && c <= "Z".charCodeAt(0) ) || (line[i] === "_")){
-				if(constructing === "none" || constructing === "variable"){
+				if(constructing === TokenType.NONE || constructing === TokenType.VARIABLE){
 					// Make token
 					word += String.fromCharCode(c);
-					constructing = "variable";
+					constructing = TokenType.VARIABLE;
 				}else{
 					// Push word token
 					shoutToken(constructing,word);
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 			}
@@ -134,27 +151,27 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 			// Variables can contain numbers aslong as it's not the first character
 			// Don't append '.' character to variable but do it for numbers
 			else if((c >= "0".charCodeAt(0) && c <= "9".charCodeAt(0)) ||
-				      (line[i] === "." && constructing !== "variable")){
-				if(constructing === "variable"){
+				      (line[i] === "." && constructing !== TokenType.VARIABLE)){
+				if(constructing === TokenType.VARIABLE){
 					// Make word token
 					word += String.fromCharCode(c);
 				}
-				else if(constructing === "none" || constructing === "num"){
+				else if(constructing === TokenType.NONE || constructing === TokenType.NUMBER){
 					// Make number token
 					let c2 = line.charCodeAt(i+1);
 					if(line[i] !== "." || (c2 >= "0".charCodeAt(0) && c2 <= "9".charCodeAt(0)))
 						word += String.fromCharCode(c);
-					constructing = "num";
+					constructing = TokenType.NUMBER;
 				}else{
 					// Push this token
 					shoutToken(constructing,word);
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 			}else if(line[i] === "/" && line[i+1] === "/"){
 				// Make token
-				constructing = "comment";
+				constructing = TokenType.COMMENT;
 				while(i < line.length){
 					word += line[i];
 					i++;
@@ -162,7 +179,7 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				// Push this token
 				shoutToken(constructing,word);
 				tokens.push(new Token(constructing,word,[], linenum));
-				constructing = "none";
+				constructing = TokenType.NONE;
 				word = "";
 			}else if((line[i] === "&" && line[i+1] === "&") ||
 						   (line[i] === "|" && line[i+1] === "|")){
@@ -170,17 +187,17 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				if(word !== ""){
 					shoutToken(constructing,word);
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 				// Make token
-				constructing = "emptylogic";
+				constructing = TokenType.EMPTYLOGIC;
 				word += line[i];
 				word += line[i+1];
 				// Push this token
 				shoutToken(constructing,word);
 				tokens.push(new Token(constructing,word,[], linenum));
-				constructing = "none";
+				constructing = TokenType.NONE;
 				word = "";
 				i++;
 			}else if(line[i] === ";"){
@@ -194,36 +211,36 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				if(word !== ""){
 					shoutToken(constructing,word);
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 				// Remove unnecessary characters
 				if((line[i] !== ","   || !REMOVE_COMMA) &&
 					 (line[i] !== "\n") &&
 					 (line[i] !== "."   || !REMOVE_DOT)){
-					constructing = "op";
+					constructing = TokenType.OPERATION;
 					word += String.fromCharCode(c);
 					shoutToken(constructing,word);
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 			}else {
 				// Push previous token because of whitespace
 				if(word !== ""){
 					tokens.push(new Token(constructing,word,[], linenum));
-					constructing = "none";
+					constructing = TokenType.NONE;
 					word = "";
 				}
 			}
 		}
 		i++;
 	}
-	if(multilineToken.type === "none"){
+	if(multilineToken.type === TokenType.NONE){
 		if(word !== ""){
 			tokens.push(new Token(constructing,word,[], linenum));
 		}
-		tokens.push(new Token("newline","\n",[], linenum));
+		tokens.push(new Token(TokenType.NEWLINE,"\n",[], linenum));
 	}
 	return multilineToken;
 }
@@ -238,50 +255,35 @@ function scopeparse(tree, filename){
 	//console.log(tree);
 	let scopeStack = [];
 	let debugStack = [];
-	let lastIdx = -1;
 	for(let i=0;i<tree.length;i++){
-		if(tree[i].word === "<" && tree[i-1].type === "newline"){
-			tree.splice(i-1,1);
-			i-=2;
-			continue;
-		}
-		if(tree[i].word === ">" && i+1 < tree.length && tree[i+1].type === "newline"){
-			//console.log("removed newline");
-			tree.splice(i+1,1);
-			i--;
-			continue;
-		}
 		if( tree[i].word === "(" ||
 				tree[i].word === "{" ||
 				tree[i].word === "["){
-				if(lastIdx === -1) {
-					scopeStack.push(i);
-					debugStack.push(tree[i].word);
-					//console.log(debugStack);
-				}
+        //console.log("Pushed",tree[i]);
+        scopeStack.push(i);
+        debugStack.push(tree[i].word);
 		}
-		lastIdx = scopeStack.length === 0 ? -1 : scopeStack[scopeStack.length-1];
 		if(tree[i].word === ")" ||
 			 tree[i].word === "}" ||
 			 tree[i].word === "]") {
-			if (lastIdx !== -1 && tree[i].word === SCOPE_DICT[tree[lastIdx].word]) {
+			if (scopeStack.length !== 0 && tree[i].word === SCOPE_DICT[debugStack[debugStack.length-1]]) {
 				let subTokens;
 				if (tree[i].word === ")")
-					subTokens = new Token("args", "", []);
+					subTokens = new Token(TokenType.ARGS, "", []);
 				if (tree[i].word === "}")
-					subTokens = new Token("scope", "", []);
+					subTokens = new Token(TokenType.SCOPE, "", []);
 				if (tree[i].word === "]")
-					subTokens = new Token("array", "", []);
+					subTokens = new Token(TokenType.ARRAY, "", []);
+        //console.log("Popped", tree[i]);
 				if (subTokens !== null) {
-					for (let k = lastIdx + 1; k < i; k++) {
+					for (let k = scopeStack[scopeStack.length-1] + 1; k < i; k++) {
 						subTokens.args.push(tree[k]);
 					}
-					let removeCount = i - lastIdx + 1;
-					tree.splice(lastIdx, removeCount, subTokens);
-					scopeStack.pop();
+					let removeCount = i - scopeStack[scopeStack.length-1] + 1;
+					tree.splice(scopeStack[scopeStack.length-1], removeCount, subTokens);
+					i = scopeStack[scopeStack.length-1];
+          scopeStack.pop();
 					debugStack.pop();
-					lastIdx = scopeStack.length === 0 ? -1 : scopeStack[scopeStack.length-1];
-					i = lastIdx;
 				}
 			}else{
 				// This occurs when one of the tokens hasn't been matched
@@ -289,8 +291,12 @@ function scopeparse(tree, filename){
 				console.log("Unmatched token error in: "+filename);
 				console.log("Current:", tree[i]);
 				console.log("Stack:  ", debugStack);
-				console.log("Behind: ", tree[i-1]);
-				console.log("Forward:", tree[i+1]);
+        console.log("Position -4:", tree[i-4]);
+        console.log("Position -3:", tree[i-3]);
+        console.log("Position -2:", tree[i-2]);
+				console.log("Position -1:", tree[i-1]);
+				console.log("Position  0:", tree[i+0]);
+				console.log("Position +1:", tree[i+1]);
 			}
 		}
 	}
@@ -305,67 +311,131 @@ function compoundScopes(tree, parentNode, index, filename){
 	for(let i=0;i<tree.length-1;i++){
 		let argsOffset = 1;
 		// Skip newline characters
-		while(i+argsOffset+1 < tree.length && tree[i+argsOffset].type === "newline"){
+		while(i+argsOffset+1 < tree.length && tree[i+argsOffset].type === TokenType.NEWLINE){
 			argsOffset++;
 		}
-		if(tree[i].type === "variable" && tree[i+argsOffset].type === "args"){
+		if(tree[i].type === TokenType.VARIABLE && tree[i+argsOffset].type === TokenType.ARGS){
 			let scopeOffset=2;
 			// Skip newline characters
-			while(i+scopeOffset+1 < tree.length && tree[i+scopeOffset].type === "newline"){
+			while(i+scopeOffset+1 < tree.length && tree[i+scopeOffset].type === TokenType.NEWLINE){
 				scopeOffset++;
 			}
-			if(i+scopeOffset < tree.length && tree[i+scopeOffset].type === "scope"){
+			if(i+scopeOffset < tree.length && tree[i+scopeOffset].type === TokenType.SCOPE){
 				// Compress components into function calls with scopes
-				tree[i].type = "functioncall";
+				tree[i].type = TokenType.FUNCTIONCALL;
 				tree[i].args = [tree[i+argsOffset],tree[i+scopeOffset]];
 				tree.splice(i+1,scopeOffset);
 			}else{
 				// Otherwise compress to function calls
-				tree[i].type = "functioncall";
+				tree[i].type = TokenType.FUNCTIONCALL;
 				tree[i].args = [tree[i+argsOffset]];
 				tree.splice(i+1,argsOffset);
 			}
 		}
+    if(i>0 && tree[i-1].word === "+" && tree[i].word === "+"){
+      tree[i-1].word = "++";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "-" && tree[i].word === "-"){
+      tree[i-1].word = "--";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
+      tree[i-1].word = "+=";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "-" && tree[i].word === "="){
+      tree[i-1].word = "-=";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
+      tree[i-1].word = "+=";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "-" && tree[i].word === "="){
+      tree[i-1].word = "-=";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
+    if(i>0 && tree[i-1].word === "!" && tree[i].word === "="){
+      tree[i-1].word = "!=";
+      tree[i-1].type = TokenType.EMPTYLOGIC;
+      tree.splice(i,1);
+      i--;
+    }
 	}
 	// Secondary pass to do more transformations after previous transforms
 	for(let i=0;i<tree.length;i++){
-    // Convert keyvalues
-    if(tree[i].word === ":" && tree[i].type !== "keyvalue"){
-      let subTokens = new Token("keyvalue",":",[tree[i-1],tree[i+1]]);
-      tree.splice(i-1,3,subTokens);
+    // Not token
+    if(tree[i].word === "!" && tree[i].type !== TokenType.LOGIC){
+      let subTokens = new Token(TokenType.LOGIC,"!",[new Token(0,"",[]),tree[i+1]], tree[i].linenum);
+      tree.splice(i,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
-		// Convert logic
-		if(tree[i].type === "emptylogic"){
-			let subTokens = new Token("logic",tree[i].word,[tree[i-1],tree[i+1]]);
-			tree.splice(i-1,3,subTokens);
-			i -= (i === 0 ? 1 : 2);
+    // Increment token
+    if(tree[i].word === "++" && tree[i].type !== TokenType.INCREMENT){
+      let subTokens = new Token(TokenType.INCREMENT,"++",[tree[i-1],new Token(0,"",[])], tree[i-1].linenum);
+      tree.splice(i-1,2,subTokens);
+      i -= (i === 0 ? 1 : 2);
 			continue;
-		}
+    }
+    // Decrement token
+    if(tree[i].word === "--" && tree[i].type !== TokenType.INCREMENT){
+      let subTokens = new Token(TokenType.INCREMENT,"--",[tree[i-1],new Token(0,"",[])], tree[i-1].linenum);
+      tree.splice(i-1,2,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
 		// Convert inequalities
-		if(tree[i].word === "!=" && tree[i].type !== "equality"){
-			let subTokens = new Token("equality","!=",[tree[i-1],tree[i+1]]);
+		if(tree[i].word === "!=" && tree[i].type !== TokenType.EQUALITY){
+      console.log(tree[i-2],tree[i-2],tree[i]);
+			let subTokens = new Token(TokenType.EQUALITY,"!=",[tree[i-1],tree[i+1]], tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert equalities
-		if(tree[i].word === "==" && tree[i].type !== "equality"){
-			let subTokens = new Token("equality","==",[tree[i-1],tree[i+1]]);
+		if(tree[i].word === "==" && tree[i].type !== TokenType.EQUALITY){
+			let subTokens = new Token(TokenType.EQUALITY,"==",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+			tree.splice(i-1,3,subTokens);
+			i -= (i === 0 ? 1 : 2);
+			continue;
+		}
+    // Convert keyvalues
+    if(tree[i].word === ":" && tree[i].type !== TokenType.KEYVALUE){
+      let subTokens = new Token(TokenType.KEYVALUE,":",[tree[i-1],tree[i+1]], tree[i-1].linenum);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+		// Convert logic
+		if(tree[i].type === TokenType.EMPTYLOGIC){
+			let subTokens = new Token(TokenType.LOGIC,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert assignments
-		if(tree[i].word === "=" && tree[i].type !== "assignment"){
-			let subTokens = new Token("assignment","=",[tree[i-1],tree[i+1]]);
+		if((tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=") && tree[i].type !== TokenType.ASSIGNMENT){
+			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], tree[i-1].linenum);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert ranges
-		if(	tree[i].type !== "range" && (
+		if(	tree[i].type !== TokenType.RANGE && (
 				tree[i].word === "<"  ||
 				tree[i].word === "<=" ||
 				tree[i].word === ">"  ||
@@ -376,7 +446,7 @@ function compoundScopes(tree, parentNode, index, filename){
 				console.log(tree[i-1]);
 				console.log(tree[i+1]);
 			}
-			let subTokens = new Token("range",tree[i].word,[tree[i-1],tree[i+1]]);
+			let subTokens = new Token(TokenType.RANGE,tree[i].word,[tree[i-1],tree[i+1]]);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
@@ -388,21 +458,23 @@ function compoundScopes(tree, parentNode, index, filename){
 function divmulparse(tree, filename){
 	for(let i=0;i<tree.length;i++){
 		if(tree[i] == null) {
+      tree.splice(i,1);
 			console.log("Error tree args null in: " + filename);
-			console.log(tree);
-		}
+			console.dir(tree,{depth:null});
+		}else{
 		divmulparse(tree[i].args, filename);
+    }
 	}
 	for(let i=1;i<tree.length;i++){
 		if(tree[i].word === "*" && tree[i].args.length === 0){
-			let subTokens = new Token("mul",tree[i].word,[]);
+			let subTokens = new Token(TokenType.MUL,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
 		if(tree[i].word === "/" && tree[i].args.length === 0){
-			let subTokens = new Token("div",tree[i].word,[]);
+			let subTokens = new Token(TokenType.DIV,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
@@ -414,21 +486,23 @@ function divmulparse(tree, filename){
 function addsubparse(tree, filename){
 	for(let i=0;i<tree.length;i++){
 		if(tree[i] == null) {
+      tree.splice(i,1);
 			console.log("Error tree args null in: " + filename);
-			console.log(tree);
-		}
+			console.dir(tree,{depth:null});
+		}else{
 		addsubparse(tree[i].args, filename);
+    }
 	}
 	for(let i=1;i<tree.length-1;i++){
 		if(tree[i].word === "+" && tree[i].args.length === 0){
-			let subTokens = new Token("add",tree[i].word,[]);
+			let subTokens = new Token(TokenType.ADD,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
 			i--;
 		}
 		if(tree[i].word === "-" && tree[i].args.length === 0){
-			let subTokens = new Token("sub",tree[i].word,[]);
+			let subTokens = new Token(TokenType.SUB,tree[i].word,[]);
 			subTokens.args.push(tree[i-1]);
 			subTokens.args.push(tree[i+1]);
 			tree.splice(i-1,3,subTokens);
@@ -440,45 +514,46 @@ function addsubparse(tree, filename){
 function checkCollapse(token){
 	if(token == null)
 		return false;
-	return  token.type === "keyvalue" || 
-			token.type === "equality" ||
-			token.type === "accessor" ||
-			token.type === "assignment" ||
-			token.type === "range" ||
-			token.type === "functiondecl" ||
-			token.type === "functioncall" ||
-			token.type === "scope" ||
-			token.type === "args" ||
-			token.type === "array" ||
-			token.type === "logic" ||
-			token.type === "mul" ||
-			token.type === "div" ||
-			token.type === "sub" ||
-			token.type === "add";
+	return  token.type === TokenType.KEYVALUE     || 
+          token.type === TokenType.EQUALITY     ||
+          token.type === TokenType.ACCESSOR     ||
+          token.type === TokenType.ASSIGNMENT   ||
+          token.type === TokenType.RANGE        ||
+          token.type === TokenType.FUNCTIONDECL ||
+          token.type === TokenType.FUNCTIONCALL ||
+          token.type === TokenType.SCOPE        ||
+          token.type === TokenType.ARGS         ||
+          token.type === TokenType.ARRAY        ||
+          token.type === TokenType.LOGIC        ||
+          token.type === TokenType.INCREMENT    ||
+          token.type === TokenType.MUL          ||
+          token.type === TokenType.DIV          ||
+          token.type === TokenType.SUB          ||
+          token.type === TokenType.ADD;
 }
 
 function binaryOperation(token){
 	if(token == null)
 		return false;
-	return token.type === "keyvalue" ||
-			token.type === "equality" ||
-			token.type === "accessor" ||
-			token.type === "assignment" ||
-			token.type === "range" ||
-			token.type === "assert" ||
-			token.type === "logic" ||
-			token.type === "mul" ||
-			token.type === "div" ||
-			token.type === "sub" ||
-			token.type === "add";
+	return  token.type === TokenType.KEYVALUE     ||
+          token.type === TokenType.EQUALITY     ||
+          token.type === TokenType.ACCESSOR     ||
+          token.type === TokenType.ASSIGNMENt   ||
+          token.type === TokenType.RANGE        ||
+          token.type === TokenType.ASSERT       ||
+          token.type === TokenType.LOGIC        ||
+          token.type === TokenType.MUL          ||
+          token.type === TokenType.DIV          ||
+          token.type === TokenType.SUB          ||
+          token.type === TokenType.ADD;
 }
 
 function checkComma(token){
 	if(token === undefined)
 		return false;
-	return  token.type === "logic" ||
-		 	token.type === "newline" ||
-		 	token.type === "multicomment";
+	return  token.type === TokenType.LOGIC        ||
+          token.type === TokenType.NEWLINE      ||
+          token.type === TokenType.MULTICOMMENT;
 }
 
 function variableDefined(scope,variable){
@@ -522,28 +597,28 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 		}
 		if(binaryOperation(tree[i])){
 				
-		}else if(tree[i].type === "functioncall"){
+		}else if(tree[i].type === TokenType.FUNCTIONCALL){
 			if(tree[i].args[0] == null){
 				console.log("Error in functioncall collapse in: ",filename);
 				console.log(tree[i]);
 			}
 			// Collapse function call
-			tree[i].type = "collapse";
+			tree[i].type = TokenType.COLLAPSE;
 			tree[i].word += tree[i].args[0].word;
 			if(tree[i].args.length > 1){
 				tree[i].word += tree[i].args[1].word;
 			}
 			tree[i].args = [];
-		}else if(tree[i].type === "functiondecl"){
+		}else if(tree[i].type === TokenType.FUNCTIONDECL){
 			// Collapse function declaration
-			tree[i].type = "collapse";
+			tree[i].type = TokenType.COLLAPSE;
 			tree[i].word = "def "+tree[i].word;
 			tree[i].word += tree[i].args[0].word;
 			if(tree[i].args.length > 1){
 				tree[i].word += tree[i].args[1].word;
 			}
 			tree[i].args = [];
-		}else	if(tree[i].type === "scope"){
+		}else	if(tree[i].type === TokenType.SCOPE){
 			if(tree[i].args.length !== 0) {
 				let empty = true;
 				// Collapse scope
@@ -551,7 +626,7 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 				for (let j = 0; j < tree[i].args.length; j++) {
 					// If argument length is not zero and not newline
 					// then the scope is not empty
-					if(empty && tree[i].args[j].word.length > 0 && tree[i].args[j].type !== "newline")
+					if(empty && tree[i].args[j].word.length > 0 && tree[i].args[j].type !== TokenType.NEWLINE)
 						empty = false;
 					tree[i].word += tree[i].args[j].word;
 				}
@@ -561,14 +636,14 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 				if(empty)
 					tree[i].word = "";
 
-				tree[i].type = "collapse";
+				tree[i].type = TokenType.COLLAPSE;
 				tree[i].args = [];
 			}else{
-				tree[i].type = "collapse";
+				tree[i].type = TokenType.COLLAPSE;
 				tree[i].word = "";
 				tree[i].args = [];
 			}
-		}else	if(tree[i].type === "array"){
+		}else	if(tree[i].type === TokenType.ARRAY){
 			// Collapse array
 			tree[i].word = "[";
 			for(let j=0;j<tree[i].args.length;j++){
@@ -583,9 +658,9 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 				}
 			}
 			tree[i].word += "]";
-			tree[i].type = "collapse";
+			tree[i].type = TokenType.COLLAPSE;
 			tree[i].args = [];
-		}else	if(tree[i].type === "args"){
+		}else	if(tree[i].type === TokenType.ARGS){
 			// Collapse arguments
 			tree[i].word = "(";
 			for(let j=0;j<tree[i].args.length;j++){
@@ -610,7 +685,7 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 				}
 			}
 			tree[i].word += ")";
-			tree[i].type = "collapse";
+			tree[i].type = TokenType.COLLAPSE;
 			tree[i].args = [];
 		}/*else{
 			// Default to concatenating everything
