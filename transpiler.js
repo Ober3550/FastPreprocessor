@@ -9,6 +9,13 @@ const TokenType = {
   EQUALITY     : "equality",
   ACCESSOR     : "accessor",
   ASSIGNMENT   : "assignment",
+  ADDEQUALS    : "addequals",
+  SUBEQUALS    : "subequals",
+  MULDEQUALS   : "mulequals",
+  DIVEQUALS    : "divequals",
+  ANDEQUALS    : "andequals",
+  OREQUALS     : "orequals",
+  XOREQUALS    : "xorequals",
   RANGE        : "range",
   FUNCTIONDECL : "functiondecl",
   FUNCTIONCALL : "functioncall",
@@ -350,6 +357,14 @@ function compoundScopes(tree, parentNode, index, filename){
       tree[i].word = "--";
       tree.splice(i-1,1);
     }
+    if(i>0 && tree[i-1].word === "&" && tree[i].word === "&"){
+      tree[i].word = "&&";
+      tree.splice(i-1,1);
+    }
+    if(i>0 && tree[i-1].word === "|" && tree[i].word === "|"){
+      tree[i].word = "||";
+      tree.splice(i-1,1);
+    }
     if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
       tree[i].word = "+=";
       tree.splice(i-1,1);
@@ -358,12 +373,24 @@ function compoundScopes(tree, parentNode, index, filename){
       tree[i].word = "-=";
       tree.splice(i-1,1);
     }
-    if(i>0 && tree[i-1].word === "+" && tree[i].word === "="){
-      tree[i].word = "+=";
+    if(i>0 && tree[i-1].word === "*" && tree[i].word === "="){
+      tree[i].word = "*=";
       tree.splice(i-1,1);
     }
-    if(i>0 && tree[i-1].word === "-" && tree[i].word === "="){
-      tree[i].word = "-=";
+    if(i>0 && tree[i-1].word === "/" && tree[i].word === "="){
+      tree[i].word = "/=";
+      tree.splice(i-1,1);
+    }
+    if(i>0 && tree[i-1].word === "&" && tree[i].word === "="){
+      tree[i].word = "&=";
+      tree.splice(i-1,1);
+    }
+    if(i>0 && tree[i-1].word === "|" && tree[i].word === "="){
+      tree[i].word = "|=";
+      tree.splice(i-1,1);
+    }
+    if(i>0 && tree[i-1].word === "^" && tree[i].word === "="){
+      tree[i].word = "^=";
       tree.splice(i-1,1);
     }
     if(i>0 && tree[i-1].word === "!" && tree[i].word === "="){
@@ -403,23 +430,72 @@ function compoundScopes(tree, parentNode, index, filename){
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "+="){
+      let subTokens = new Token(TokenType.ADDEQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "-="){
+      let subTokens = new Token(TokenType.SUBEQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "*="){
+      let subTokens = new Token(TokenType.MULEQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "/="){
+      let subTokens = new Token(TokenType.DIVEQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "&="){
+      let subTokens = new Token(TokenType.ANDEQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "|="){
+      let subTokens = new Token(TokenType.OREQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    // Decrement token
+    if(tree[i].uncaptured && tree[i].word === "^="){
+      let subTokens = new Token(TokenType.XOREQUALS,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,3,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
 		// Convert inequalities
 		if(tree[i].uncaptured && tree[i].word === "!="){
-			let subTokens = new Token(TokenType.EQUALITY,"!=",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+			let subTokens = new Token(TokenType.EQUALITY,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
 		// Convert equalities
 		if(tree[i].uncaptured && tree[i].word === "=="){
-			let subTokens = new Token(TokenType.EQUALITY,"==",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+			let subTokens = new Token(TokenType.EQUALITY,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
 		}
     // Convert keyvalues
     if(tree[i].uncaptured && tree[i].word === ":"){
-      let subTokens = new Token(TokenType.KEYVALUE,":",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+      let subTokens = new Token(TokenType.KEYVALUE,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
       tree.splice(i-1,3,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
@@ -454,7 +530,7 @@ function compoundScopes(tree, parentNode, index, filename){
   for(let i=0;i<tree.length;i++){
     // Convert assignments
 		if(tree[i].uncaptured && (tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=")){
-			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+			let subTokens = new Token(TokenType.ASSIGNMENT,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
 			continue;
@@ -549,10 +625,18 @@ function checkCollapse(token){
           token.type === TokenType.INCREMENT    ||
           token.type === TokenType.DECREMENT    ||
           token.type === TokenType.POINTER      ||
-          token.type === TokenType.MUL          ||
-          token.type === TokenType.DIV          ||
+          token.type === TokenType.ADD          ||
           token.type === TokenType.SUB          ||
-          token.type === TokenType.ADD;
+          token.type === TokenType.DIV          ||
+          token.type === TokenType.MUL          ||
+          token.type === TokenType.ADDEQUALS    ||
+          token.type === TokenType.SUBEQUALS    ||
+          token.type === TokenType.DIVEQUALS    ||
+          token.type === TokenType.MULEQUALS    ||
+          token.type === TokenType.ANDEQUALS    ||
+          token.type === TokenType.OREQUALS     ||
+          token.type === TokenType.XOREQUALS;
+
 }
 
 function binaryOperation(token){
@@ -565,10 +649,17 @@ function binaryOperation(token){
           token.type === TokenType.RANGE        ||
           token.type === TokenType.ASSERT       ||
           token.type === TokenType.LOGIC        ||
-          token.type === TokenType.MUL          ||
-          token.type === TokenType.DIV          ||
-          token.type === TokenType.SUB          ||
           token.type === TokenType.ADD          ||
+          token.type === TokenType.SUB          ||
+          token.type === TokenType.DIV          ||
+          token.type === TokenType.MUL          ||
+          token.type === TokenType.ADDEQUALS    ||
+          token.type === TokenType.SUBEQUALS    ||
+          token.type === TokenType.DIVEQUALS    ||
+          token.type === TokenType.MULEQUALS    ||
+          token.type === TokenType.ANDEQUALS    ||
+          token.type === TokenType.OREQUALS     ||
+          token.type === TokenType.XOREQUALS    ||
           token.type === TokenType.INCREMENT    ||
           token.type === TokenType.DECREMENT    ||
           token.type === TokenType.POINTER      ||
@@ -636,7 +727,6 @@ function collapseTree(tree, filename, startIn, endIn){
 			}
 		}
     if(binaryOperation(tree[i]) && tree[i].args.length > 0){
-      console.log(tree[i]);
       tree[i].type == TokenType.COLLAPSE;
       let operation = tree[i].word;
       tree[i].word = "";
@@ -708,11 +798,12 @@ function collapseTree(tree, filename, startIn, endIn){
 			// Collapse arguments
 			tree[i].word = "(";
 			for(let j=0;j<tree[i].args.length;j++){
+        
+        if(j > 0 && tree[i].args[j].type !== TokenType.SEMICOLON && tree[i].args[j].type !== TokenType.COMMA)
+          tree[i].word += " ";
+        
 				// Add the variable to the args collapse
 				tree[i].word += tree[i].args[j].word;
-
-        if(addSpace(tree[i].args[j+1]) && j<tree[i].args.length-1)
-          tree[i].word += " ";
 			}
 			tree[i].word += ")";
 			tree[i].type = TokenType.COLLAPSE;
@@ -764,7 +855,11 @@ function saveTree(outputDirectory,filename,filecontents,callback){
 function flatten(tree){
 	let flattened = "";
 	for(let i=0;i<tree.length;i++){
-    if(tree[i-1] != null && tree[i] != null && tree[i-1].type !== TokenType.NEWLINE  && tree[i].type !== TokenType.NEWLINE)
+    if(tree[i-1] != null && tree[i] != null 
+    && tree[i-1].type !== TokenType.NEWLINE  
+    && tree[i].type !== TokenType.NEWLINE
+    && tree[i].type !== TokenType.SEMICOLON
+    && tree[i].type !== TokenType.COMMA)
       flattened += " ";
 		flattened += tree[i].word;
 	}

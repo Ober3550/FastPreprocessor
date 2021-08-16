@@ -7,32 +7,32 @@
 #define GOTO_MEMORY 20
 
 // type definitions and struct
-typedef enum {false , true} bool ; // making an enum for booleans, better than macros
-typedef char string [PROGRAM_MEMORY] ;
+typedef enum {false , true} bool; // making an enum for booleans, better than macros
+typedef char string [PROGRAM_MEMORY];
 
 struct stringAndPointer
 {
 int i;// position in array
 char*p;// pointer to array 
 string a;// array
-} ;
+};
 
 struct gotoExpressions
 {
 char*a[GOTO_MEMORY];
 char l [GOTO_MEMORY];
 int i;
-} ;
+};
 
-typedef struct stringAndPointer sap ;
+typedef struct stringAndPointer sap;
 
 // globals
-char b , o ;
-sap out , in ;
+char b, o;
+sap out, in;
 
 // meta functions
 
-int strLength(const char*str){
+int strLength(const char *str){
 int length = 0;
 
 while(*str++)length++;
@@ -40,15 +40,15 @@ while(*str++)length++;
 return length;
 }
 
-bool compareString(char*str0 , char*str1){
+bool compareString(char *str0, char *str1){
 int length;
 
 if((length = strLength(str0)) != strLength (str1)){
 return false;
 }
 
-for(int i = 0; i < length;i++){
-if(*str0++ *  != str1++) return false;
+for(int i = 0; i < length; i++){
+if(*str0++ *  !=  str1++) return false;
 }
 
 return true;
@@ -56,7 +56,7 @@ return true;
 
 // the main program
 
-void interpret(char*c , int argc){
+void interpret(char *c, int argc){
 char*d;// for assigning c to when the [] loop is activated on lines 43 - 60
 int base = 1;// goto the ^ and v cases for info vvvvv
 int comments = false;// a boolean, true when comments are active and false when they're not
@@ -67,7 +67,7 @@ struct gotoExpressions jmp;
 int oldJmpI;
 bool changed = false;
 
-for(jmp.i = 0; jmp.i < GOTO_MEMORY;jmp.i++){
+for(jmp.i = 0; jmp.i < GOTO_MEMORY; jmp.i++){
 jmp.a[jmp.i] = 0;
 }
 
@@ -78,11 +78,11 @@ if( ! comments){
 switch(o = 1 , * c++){
 // added stuff
 case '|' : comments = true;break;// adds commenting properly as: code here|comment here|code here
-case'*' : out.a[out.i] * = out.a [out.i + 1];break;// multiplies current cell by its upper neighbour
-case'x' : out.a[out.i] * = out.a [out.i - 1];break;// multiplies current cell by its lower neighbour
+case'*' : out.a*=.a[out.i + 1];break;// multiplies current cell by its upper neighbour
+case'x' : out.a*=.a[out.i - 1];break;// multiplies current cell by its lower neighbour
 case '/' : // divides current cell by its upper neighbour
-if((out.a [out.i] != 0) & & (out.a [out.i + 1] != 0))
-out.a[out.i] / = out.a [out.i + 1];
+if((out.a [out.i] != 0) && (out.a [out.i + 1] != 0))
+out.a[out.i] /= out.a[out.i + 1];
 else
 {
 puts("CAN'T DIVIDE BY ZERO");
@@ -90,8 +90,8 @@ return;
 }
 break;
 '\\' : // divides current cell by its lower neighbour
-if((out.a [out.i] != 0) & & (out.a [out.i - 1] != 0))
-out.a[out.i] / = out.a [out.i - 1];
+if((out.a [out.i] != 0) && (out.a [out.i - 1] != 0))
+out.a[out.i] /= out.a[out.i - 1];
 else
 {
 puts("CAN'T DIVIDE BY ZERO");
@@ -116,7 +116,7 @@ return;
 
 *c++;
 
-for(int i = 0; i < GOTO_MEMORY;i++){
+for(int i = 0; i < GOTO_MEMORY; i++){
 if(jmp.l [i] = = * c){
 jmp.i = i;
 changed = true;
@@ -150,19 +150,19 @@ return;
 }
 break;
 case'>' : out.i++;break;
-case'+' : out.a[out.i] = base;break;
-case'-' : out.a[out.i] = base;break;
+case'+' : out.a[out.i] += base;break;
+case'-' : out.a[out.i] -= base;break;
 case '.' : putchar(out.a [out.i]);break;
 case',' : out.a[out.i] = getchar();break;
 case '[' : 
- for(b = 1 , d = c; b & & * c;c++){
-b *  =  c = = '[' , b *  =  c = = ']';
+ for(b = 1, d = c; b && * c; c++){
+b *  +=  c = = '[' , b *  -=  c = = ']';
 }
 
 if( ! b){
 c [-1] = 0;
 while(out.a [out.i]){
-interpret(d , argc);
+interpret(d, argc);
 }
 }
 
@@ -179,14 +179,14 @@ else if(*c++ = = '|'){
 comments =  ! comments;
 }
 
-if(out.i < 0 | | out.i > 100){
+if(out.i < 0 || out.i > 100){
 puts("RANGE ERROR");
 return;
 }
 }
 }
 
-int main(int argc , char*argv []){
+int main(int argc, char *argv []){
 // initialising structs/new types
 in.p = in.a;
 in.i = 0;
@@ -197,7 +197,7 @@ out.i = 0;
 char *f = "-f";
 char *i = "-i";
 
-if(compareString(argv [1] , f)){
+if(compareString(argv [1], f)){
 // // for interpreting programs as files
 // printf("Proccessing file...\n");
 // FILE * program = fopen(argv[2], "r");
@@ -212,7 +212,7 @@ if(compareString(argv [1] , f)){
 // 	interpret(in.a, argc);
 // }
 }
-else if(compareString(argv [1] , i)){
+else if(compareString(argv [1], i)){
 // // message used to explain use
 // printf("Write your program, character by character, using enter to interpret it as you need to.\n\n");
 
@@ -258,16 +258,16 @@ else
 {
 // for interpreting programs as command line arguments
 printf("Processing command line arguments as a code.\n");
-for(int i = 1; i < argc;i++) // iterating through each argument seperated by spaces
+for(int i = 1; i < argc; i++) // iterating through each argument seperated by spaces
 {
-for(int j = 0; j < strLength(argv [i]);j++) // iterating through each char
+for(int j = 0; j < strLength(argv [i]); j++) // iterating through each char
 {
 *in.p++ = (char) ((argv [i]) [j]);// assigning character to in[] and increment the pointer
 }
 if(i < argc) *in.p++ = ' ';// adding in spaces based on argc and i
 }
 *in.p = 0;
-interpret(in.a , argc);
+interpret(in.a, argc);
 }
 return 0;////////// EXIT
 }
