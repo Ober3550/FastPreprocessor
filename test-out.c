@@ -48,7 +48,7 @@ return false;
 }
 
 for(int i = 0; i < length; i++){
-if(*str0++ *  !=  str1++) return false;
+if(*str0++ != *str1++) return false;
 }
 
 return true;
@@ -74,15 +74,15 @@ jmp.a[jmp.i] = 0;
 jmp.i = 0;
 
 while(*c){
-if( ! comments){
-switch(o = 1 , * c++){
+if(!comments){
+switch(o = 1, *c++){
 // added stuff
 case '|' : comments = true;break;// adds commenting properly as: code here|comment here|code here
-case'*' : out.a*=.a[out.i + 1];break;// multiplies current cell by its upper neighbour
-case'x' : out.a*=.a[out.i - 1];break;// multiplies current cell by its lower neighbour
+case '*' : out.a [out.i] = out.a [out.i + 1];break;// multiplies current cell by its upper neighbour
+case 'x' : out.a [out.i] = out.a [out.i - 1];break;// multiplies current cell by its lower neighbour
 case '/' : // divides current cell by its upper neighbour
 if((out.a [out.i] != 0) && (out.a [out.i + 1] != 0))
-out.a[out.i] /= out.a[out.i + 1];
+out.a[out.i] /= out.a [out.i + 1];
 else
 {
 puts("CAN'T DIVIDE BY ZERO");
@@ -91,25 +91,25 @@ return;
 break;
 '\\' : // divides current cell by its lower neighbour
 if((out.a [out.i] != 0) && (out.a [out.i - 1] != 0))
-out.a[out.i] /= out.a[out.i - 1];
+out.a[out.i] /= out.a [out.i - 1];
 else
 {
 puts("CAN'T DIVIDE BY ZERO");
 return;
 }
 break;
-case'#' : out.a[out.i] *  =  c;break;// makes the current cell = the next character as a char value (syntax for making cell = #d)
-case'^' : base++;break;// increases the base
+case '#' : out.a [out.i] = *c;break;// makes the current cell = the next character as a char value (syntax for making cell = #d)
+case '^' : base++;break;// increases the base
 case 'v' : if(base > 1)base--;break;// decreases the base if is larger than one
 case '{' : 
 jmp.a[jmp.i] = c;
-jmp.l[jmp.i] *  =  c;
+jmp.l[jmp.i] = *c;
 jmp.i++;
 break;
 case '}' : 
  oldJmpI = jmp.i--;
 
-if(jmp.a [jmp.i] = = 0){
+if(jmp.a [jmp.i] == 0){
 puts("CAN'T FIND LABEL");
 return;
 }
@@ -117,7 +117,7 @@ return;
 *c++;
 
 for(int i = 0; i < GOTO_MEMORY; i++){
-if(jmp.l [i] = = * c){
+if(jmp.l [i] == *c){
 jmp.i = i;
 changed = true;
 break;
@@ -149,17 +149,17 @@ puts("POINTER IS NEGATIVE");
 return;
 }
 break;
-case'>' : out.i++;break;
-case'+' : out.a[out.i] += base;break;
-case'-' : out.a[out.i] -= base;break;
+case '>' : out.i++;break;
+case '+' : out.a [out.i] += base;break;
+case '-' : out.a [out.i] -= base;break;
 case '.' : putchar(out.a [out.i]);break;
-case',' : out.a[out.i] = getchar();break;
+case ',' : out.a [out.i] = getchar();break;
 case '[' : 
- for(b = 1, d = c; b && * c; c++){
-b *  +=  c = = '[' , b *  -=  c = = ']';
+ for(b = 1, d = c; b && *c; c++){
+b += *c == '[' , b -= *c == ']';
 }
 
-if( ! b){
+if(!b){
 c [-1] = 0;
 while(out.a [out.i]){
 interpret(d, argc);
@@ -175,8 +175,8 @@ return;
 default : o = 0;
 }
 }
-else if(*c++ = = '|'){
-comments =  ! comments;
+else if(*c++ == '|'){
+comments = !comments;
 }
 
 if(out.i < 0 || out.i > 100){
