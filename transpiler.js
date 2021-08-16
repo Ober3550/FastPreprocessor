@@ -30,6 +30,8 @@ const TokenType = {
   POINTER      : "pointer",
   INCREMENT    : "increment",
   DECREMENT    : "decrement",
+  SEMICOLON    : ";",
+  COMMA        : ",",
   KEYBOOL      : "bool",
   KEYCHAR      : "char",
   KEYSHORT     : "short",
@@ -41,6 +43,7 @@ const TokenType = {
   KEYCASE      : "case",
   KEYBREAK     : "break",
   KEYELSE      : "else",
+  KEYRETURN    : "return",
   COLLAPSE     : "collapse"
 }
 Object.freeze(TokenType);
@@ -56,7 +59,10 @@ const Keywords = {
   "void"       : TokenType.KEYVOID,
   "case"       : TokenType.KEYCASE, 
   "break"      : TokenType.KEYBREAK, 
-  "else"       : TokenType.KEYELSE
+  "else"       : TokenType.KEYELSE,
+  "return"     : TokenType.KEYRETURN,
+  ";"          : TokenType.SEMICOLON,
+  ","          : TokenType.COMMA
 }
 
 class Token{
@@ -84,16 +90,17 @@ let KEEP_IMPORTS = true;
 let META_ANALYSIS = true;
 let ALL_FUNCTIONS = [];
 let ALL_IMPORTS   = [];
+let FILENUM       = 1;
 
 function shoutToken(constructing,word){
 	if(DEBUG_TOKENS)
-		console.log("push "+constructing+" "+word);
+		permLog("push "+constructing+" "+word);
 }
 
 function tokenize(line, tokens, multilineToken, filename, linenum){
   	lines++;
   	if(lines % 1000 === 0)
-  		console.log("Processed "+lines+" lines");
+  		permLog("Processed "+lines+" lines");
 	let i=0;
 	let constructing = TokenType.NONE;
 	let word = "";
@@ -162,7 +169,8 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 			}
 			// If lowercase or uppercase letters
 			else if((c >= "a".charCodeAt(0) && c <= "z".charCodeAt(0) ) ||
-				      (c >= "A".charCodeAt(0) && c <= "Z".charCodeAt(0) ) || (line[i] === "_")){
+				      (c >= "A".charCodeAt(0) && c <= "Z".charCodeAt(0) ) || 
+              (line[i] === "_") || line[i] === "#"){
 				if(constructing === TokenType.NONE || constructing === TokenType.VARIABLE){
 					// Make token
 					word += String.fromCharCode(c);
@@ -209,11 +217,9 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 				tokens.push(new Token(constructing,word,[], linenum));
 				constructing = TokenType.NONE;
 				word = "";
-			}else if(line[i] === ";"){
-				//discard semicolons
 			}else if(line[i]==="*" && line[i+1]==="/"){
 				if(LOG_ORPHANED)
-					console.log("Orphaned comment close line: "+linenum+" in: "+filename);
+					permLog("Orphaned comment close line: "+linenum+" in: "+filename);
 				i++;
 			}else if(c > 32){
 				// Push previous token
@@ -224,8 +230,7 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 					word = "";
 				}
 				// Remove unnecessary characters
-				if((line[i] !== ","   || !REMOVE_COMMA) &&
-					 (line[i] !== "\n")){
+				if((line[i] !== "\n")){
 					constructing = TokenType.OPERATION;
 					word += String.fromCharCode(c);
 					shoutToken(constructing,word);
@@ -260,14 +265,12 @@ let SCOPE_DICT = {
 }
 
 function scopeparse(tree, filename){
-	//console.log(tree);
 	let scopeStack = [];
 	let debugStack = [];
 	for(let i=0;i<tree.length;i++){
 		if( tree[i].word === "(" ||
 				tree[i].word === "{" ||
 				tree[i].word === "["){
-        //console.log("Pushed",tree[i]);
         scopeStack.push(i);
         debugStack.push(tree[i].word);
 		}
@@ -282,7 +285,6 @@ function scopeparse(tree, filename){
 					subTokens = new Token(TokenType.SCOPE, "", []);
 				if (tree[i].word === "]")
 					subTokens = new Token(TokenType.ARRAY, "", []);
-        //console.log("Popped", tree[i]);
 				if (subTokens !== null) {
 					for (let k = scopeStack[scopeStack.length-1] + 1; k < i; k++) {
 						subTokens.args.push(tree[k]);
@@ -296,15 +298,15 @@ function scopeparse(tree, filename){
 			}else{
 				// This occurs when one of the tokens hasn't been matched
 				// for example unmatched quotes capturing code that's not meant to be a string
-				console.log("Unmatched token error in: "+filename);
-				console.log("Current:", tree[i]);
-				console.log("Stack:  ", debugStack);
-        console.log("Position -4:", tree[i-4]);
-        console.log("Position -3:", tree[i-3]);
-        console.log("Position -2:", tree[i-2]);
-				console.log("Position -1:", tree[i-1]);
-				console.log("Position  0:", tree[i+0]);
-				console.log("Position +1:", tree[i+1]);
+				permLog("Unmatched token error in: "+filename);
+				permLog("Current:", tree[i]);
+				permLog("Stack:  ", debugStack);
+        permLog("Position -4:", tree[i-4]);
+        permLog("Position -3:", tree[i-3]);
+        permLog("Position -2:", tree[i-2]);
+				permLog("Position -1:", tree[i-1]);
+				permLog("Position  0:", tree[i+0]);
+				permLog("Position +1:", tree[i+1]);
 			}
 		}
 	}
@@ -403,7 +405,6 @@ function compoundScopes(tree, parentNode, index, filename){
     }
 		// Convert inequalities
 		if(tree[i].uncaptured && tree[i].word === "!="){
-      console.log(tree[i-2],tree[i-2],tree[i]);
 			let subTokens = new Token(TokenType.EQUALITY,"!=",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
 			tree.splice(i-1,3,subTokens);
 			i -= (i === 0 ? 1 : 2);
@@ -423,13 +424,6 @@ function compoundScopes(tree, parentNode, index, filename){
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
-		// Convert assignments
-		if(tree[i].uncaptured && (tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=")){
-			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
-			tree.splice(i-1,3,subTokens);
-			i -= (i === 0 ? 1 : 2);
-			continue;
-		}
 		// Convert ranges
 		if(	tree[i].uncaptured && (
 				tree[i].word === "<"  ||
@@ -438,9 +432,9 @@ function compoundScopes(tree, parentNode, index, filename){
 				tree[i].word === ">="
 				)){
 			if(tree[i-1] == null || tree[i+1] == null){
-				console.log("Range compare error in: "+filename);
-				console.log(tree[i-1]);
-				console.log(tree[i+1]);
+				permLog("Range compare error in: "+filename);
+				permLog(tree[i-1]);
+				permLog(tree[i+1]);
 			}
 			let subTokens = new Token(TokenType.RANGE,tree[i].word,[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
 			tree.splice(i-1,3,subTokens);
@@ -448,6 +442,24 @@ function compoundScopes(tree, parentNode, index, filename){
 			continue;
 		}
 	}
+  // Third pass to do more transformations after previous transforms
+	for(let i=0;i<tree.length;i++){
+    if(tree[i].uncaptured && tree[i].word === "*" && isKeyword(tree[i-1])){
+      let subTokens = new Token(TokenType.POINTER, tree[i].word, [new Token(), tree[i+1]], tree[i+1].linenum, TokenType.CAPTURED);
+      tree.splice(i,2,subTokens);
+      i--;
+    }
+  }
+  // Fourth pass
+  for(let i=0;i<tree.length;i++){
+    // Convert assignments
+		if(tree[i].uncaptured && (tree[i].word === "=" || tree[i].word === "+=" || tree[i].word === "-=")){
+			let subTokens = new Token(TokenType.ASSIGNMENT,"=",[tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
+			tree.splice(i-1,3,subTokens);
+			i -= (i === 0 ? 1 : 2);
+			continue;
+		}
+  }
 }
 
 // Collapse arguments from multiply and div operations
@@ -455,8 +467,7 @@ function divmulparse(tree, filename){
 	for(let i=0;i<tree.length;i++){
 		if(tree[i] == null) {
       tree.splice(i,1);
-			console.log("Error tree args null in: " + filename);
-			console.dir(tree,{depth:null});
+			permLog("Removed undefined token in divmul: " + filename);
 		}else{
 		divmulparse(tree[i].args, filename);
     }
@@ -467,10 +478,6 @@ function divmulparse(tree, filename){
         let subTokens = new Token(TokenType.MUL, tree[i].word, [tree[i-1],tree[i+1]], tree[i-1].linenum, TokenType.CAPTURED);
         tree.splice(i-1,3,subTokens);
         i--;
-      }else{
-        let subTokens = new Token(TokenType.POINTER, tree[i].word, [tree[i+1]], tree[i+1].linenum, TokenType.CAPTURED);
-        tree.splice(i,2,subTokens);
-        i--;
       }
     }
 		if(tree[i].uncaptured && tree[i].word === "/"){
@@ -480,13 +487,13 @@ function divmulparse(tree, filename){
 		}
 	}
 }
+
 // Collapse arguments from addition and subtraction operations
 function addsubparse(tree, filename){
 	for(let i=0;i<tree.length;i++){
 		if(tree[i] == null) {
       tree.splice(i,1);
-			console.log("Error tree args null in: " + filename);
-			console.dir(tree,{depth:null});
+			permLog("Removed undefined token in addsub: " + filename);
 		}else{
 		addsubparse(tree[i].args, filename);
     }
@@ -507,7 +514,7 @@ function addsubparse(tree, filename){
 
 function isKeyword(token){
   if(token == null)
-    return false;
+    return true;
   return  token.type === TokenType.KEYBOOL      ||
           token.type === TokenType.KEYCHAR      ||
           token.type === TokenType.KEYSHORT     ||
@@ -540,6 +547,8 @@ function checkCollapse(token){
           token.type === TokenType.ARRAY        ||
           token.type === TokenType.LOGIC        ||
           token.type === TokenType.INCREMENT    ||
+          token.type === TokenType.DECREMENT    ||
+          token.type === TokenType.POINTER      ||
           token.type === TokenType.MUL          ||
           token.type === TokenType.DIV          ||
           token.type === TokenType.SUB          ||
@@ -567,17 +576,34 @@ function binaryOperation(token){
 }
 
 function checkComma(token){
-	if(token === undefined)
+	if(token == null)
 		return false;
+  if(isKeyword(token))
+    return true;
 	return  token.type === TokenType.LOGIC        ||
           token.type === TokenType.NEWLINE      ||
           token.type === TokenType.MULTICOMMENT;
 }
 
+function addSpace(token){
+  if(token == null)
+    return false;
+  if( token.type === TokenType.ACCESSOR         ||
+      token.type === TokenType.NONE             ||
+      token.type === TokenType.INCREMENT        ||
+      token.type === TokenType.DECREMENT        ||
+      token.type === TokenType.POINTER          ||
+      token.type === TokenType.SEMICOLON        ||
+      token.type === TokenType.NEWLINE
+  )
+  return false;
+  return true;
+}
+
 function variableDefined(scope,variable){
 	if(scope == null){
-		console.log("Error in variable defined");
-		console.log(variable);
+		permLog("Error in variable defined");
+		permLog(variable);
 	}
 	for(let i=0;i<scope.length;i++){
 		if(scope[i] === variable)
@@ -595,32 +621,34 @@ function replaceAll(string, input, output){
 	return result;
 }
 
-function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endIn){
+function collapseTree(tree, filename, startIn, endIn){
 	let start = 0;
 	let end = tree.length;
 	if(startIn != null)
 		start = startIn;
 	if(endIn != null)
 		end = endIn;
-	let declaredVariables = [];
-	for(let i=0;i<parentDeclared.length;i++){
-		declaredVariables.push(parentDeclared[i]);
-	}
 	for(let i=start;i<end;i++){
 		// Collapse substructures
 		for(let j=0;j<tree[i].args.length;j++){
 			if(checkCollapse(tree[i].args[j])) {
-				collapseTree(tree[i].args, root, declaredVariables, depth+1, filename);
+				collapseTree(tree[i].args, filename);
 			}
 		}
     if(binaryOperation(tree[i])){
       tree[i].type == TokenType.COLLAPSE;
-      tree[i].word = tree[i].args[0].word + tree[i].word + tree[i].args[1].word;
+      let operation = tree[i].word;
+      tree[i].word = "";
+      tree[i].word += (tree[i].args[0] == null) ? "" : tree[i].args[0].word;
+      if(addSpace(tree[i])) tree[i].word += " ";
+      tree[i].word += operation;
+      if(addSpace(tree[i])) tree[i].word += " ";
+      tree[i].word += (tree[i].args[1] == null) ? "" : tree[i].args[1].word;
       tree[i].args = [];
 		}else if(tree[i].type === TokenType.FUNCTIONCALL){
 			if(tree[i].args[0] == null){
-				console.log("Error in functioncall collapse in: ",filename);
-				console.log(tree[i]);
+				permLog("Error in functioncall collapse in: ",filename);
+				permLog(tree[i]);
 			}
 			// Collapse function call
 			tree[i].type = TokenType.COLLAPSE;
@@ -649,6 +677,9 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 					if(empty && tree[i].args[j].word.length > 0 && tree[i].args[j].type !== TokenType.NEWLINE)
 						empty = false;
 					tree[i].word += tree[i].args[j].word;
+          if(addSpace(tree[i].args[j]) && addSpace(tree[i].args[j+1])){
+            tree[i].word += " ";
+          }
 				}
 				tree[i].word += "}";
 
@@ -667,15 +698,7 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 			// Collapse array
 			tree[i].word = "[";
 			for(let j=0;j<tree[i].args.length;j++){
-				// Slice off semicolon
-				let wordLast = tree[i].args[j].word.length-1;
-				if(tree[i].args[j].word[wordLast] === ";")
-					tree[i].args[j].word = tree[i].args[j].word.slice(0,wordLast);
-
 				tree[i].word += tree[i].args[j].word;
-				if(j<tree[i].args.length-1 && !checkComma(tree[i].args[j])){
-					tree[i].word += ", ";
-				}
 			}
 			tree[i].word += "]";
 			tree[i].type = TokenType.COLLAPSE;
@@ -684,11 +707,6 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 			// Collapse arguments
 			tree[i].word = "(";
 			for(let j=0;j<tree[i].args.length;j++){
-				// Slice off semicolon
-				let wordLast = tree[i].args[j].word.length-1;
-				if(tree[i].args[j].word[wordLast] === ";")
-					tree[i].args[j].word = tree[i].args[j].word.slice(0,wordLast);
-
 				// If element is a property add quotes around it
 				if(tree[i].args[j].type === "property")
 					tree[i].args[j].word = '"' + tree[i].args[j].word + '"';
@@ -696,13 +714,8 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 				// Add the variable to the args collapse
 				tree[i].word += tree[i].args[j].word;
 
-				// Variables that are defined in function declaration are already defined
-				// Add these variables so that the assignments don't redefine the variables
-				declaredVariables.push(tree[i].args[j].word);
-
-				if(j<tree[i].args.length-1 && !checkComma(tree[i].args[j]) && !checkComma(tree[i].args[j+1])){
-					tree[i].word += ", ";
-				}
+        if(j<tree[i].args.length-1)
+          tree[i].word += " ";
 			}
 			tree[i].word += ")";
 			tree[i].type = TokenType.COLLAPSE;
@@ -719,8 +732,16 @@ function collapseTree(tree, root, parentDeclared, depth, filename, startIn, endI
 	}
 }
 
+function permLog(){
+  let concat = "";
+  for(let i=0;i<arguments.length;i++){
+    concat += (i!=0) ? " " : "" + arguments[i]; 
+  }
+  console.log(concat);
+}
+
 function saveTree(outputDirectory,filename,filecontents,callback){
-	let newfilename = outputDirectory+filename.replace(".test",".groovy");
+	let newfilename = outputDirectory+filename;
 	// Test if file exists
 	fs.writeFile(newfilename,'',(err)=>{
 		if(err) {
@@ -729,14 +750,14 @@ function saveTree(outputDirectory,filename,filecontents,callback){
 			fs.mkdir(directory, {recursive: true}, (err) => {
 				// Empty file again
 				fs.writeFile(newfilename,filecontents,(err)=>{
-					console.log("Saved to file: "+newfilename);
+					permLog("Saved to file: "+newfilename);
 					callback();
 				});
 			})
 		}else{
 			// Write tree
 			fs.writeFile(newfilename,filecontents,(err)=>{
-				console.log("Saved to file: "+newfilename);
+				permLog("Saved to file: "+newfilename);
 				callback();
 			});
 		}
@@ -746,6 +767,8 @@ function saveTree(outputDirectory,filename,filecontents,callback){
 function flatten(tree){
 	let flattened = "";
 	for(let i=0;i<tree.length;i++){
+    if(tree[i-1] != null && tree[i] != null && tree[i-1].type !== TokenType.NEWLINE  && tree[i].type !== TokenType.NEWLINE)
+      flattened += " ";
 		flattened += tree[i].word;
 	}
 	return flattened;
@@ -773,7 +796,7 @@ function createDirectoryTree(dir) {
 
 function processFile(outputDirectory,filepath,callback){
 	let tokens = [];
-	console.log("Processing: "+filepath);
+	permLog("Processing: "+filepath);
 	const linereader = require("readline").createInterface({
 		input: fs.createReadStream(filepath),
 		crlfDelay: Infinity
@@ -785,13 +808,20 @@ function processFile(outputDirectory,filepath,callback){
 		multilineToken = tokenize(line, tokens, multilineToken, filepath, linenum);
 	});
 	linereader.on("close",()=>{
-    console.log("lexed");
 		scopeparse(tokens, filepath);
 		compoundScopes(tokens, null, null, filepath);
     divmulparse(tokens, filepath);
 		addsubparse(tokens, filepath);
-		console.dir(tokens,{depth:null});
-    callback();
+    collapseTree(tokens, filepath);
+		//console.dir(tokens,{depth:null});
+    filepath = replaceAll(filepath,"\\","/");
+    let pathList  = filepath.split("/");
+    let filename  = pathList.pop();
+    let directory = pathList.join("/");
+    if(directory.length > 0) directory += "/";
+    saveTree(directory,filename.replace("\.c","-out.c"),flatten(tokens),()=>{
+      callback();
+    });
 	});
 }
 
@@ -812,21 +842,33 @@ function processMultiple(outputDirectory, dependencies, callback, newdependencie
 function printFunctions(printFunctions){
 	let functions = Object.keys(printFunctions);
 	functions = functions.sort((a,b)=>{return printFunctions[a]-printFunctions[b]});
-	console.log("ALL Functions:  [");
+	permLog("ALL Functions:  [");
 	for(let i=0;i<functions.length;i++){
 		let padded = ""+printFunctions[functions[i]]
 		while(padded.length < 5){
 			padded = " "+padded;
 		}
-		console.log(padded," : ",functions[i]);
+		permLog(padded," : ",functions[i]);
 	}
-	console.log("]");
+	permLog("]");
 }
 
 function printUsage(){
-	console.log("Usage: node transpiler filename");
-	console.log("       node transpiler directory");
-	console.log("       node transpiler directory filename");
+	permLog("Usage: node transpiler filename");
+	permLog("       node transpiler directory");
+	permLog("       node transpiler directory filename");
+}
+
+function printStats(){
+  //printFunctions(ALL_FUNCTIONS);
+  ALL_IMPORTS   = ALL_IMPORTS.sort();
+  //permLog("ALL Imports: ",  ALL_IMPORTS);
+  END_EXEC = new Date();
+  let DIFF = new Date(END_EXEC-START_EXEC);
+  if(FILENUM > 1)
+    permLog("Files processed: "+FILENUM);
+	permLog("Lines processed: "+lines);
+  permLog("Timing: "+DIFF.getMinutes()+"m "+DIFF.getSeconds()+"s "+DIFF.getMilliseconds()+"ms");
 }
 
 function load(){
@@ -838,47 +880,29 @@ function load(){
 		// If one file argument is passed
 		if(process.argv[2].includes(".")){
 			processFile("../src/test/groovy/",process.argv[2],()=>{
-				printFunctions(ALL_FUNCTIONS);
-				ALL_IMPORTS   = ALL_IMPORTS.sort();
-				console.log("ALL Imports: ",  ALL_IMPORTS);
-				END_EXEC = new Date();
-				let DIFF = new Date(END_EXEC-START_EXEC);
-				console.log(lines+" lines processed in: "+DIFF.getMinutes()+"m "+DIFF.getSeconds()+"s "+DIFF.getMilliseconds()+"ms");
-			});
+        printStats();
+      });
 		}else{
 			// If one directory argument is passed
 			if(process.argv[3] == null){
 				let fileList = createDirectoryTree(process.argv[2]);
 				let testList = fileList.filter(file => file.match(/.test$/));
-				let fileNum = testList.length;
-				console.log(testList);
+				FILENUM = testList.length;
+				permLog(testList);
 				processMultiple("../src/output/", testList,()=>{
-					printFunctions(ALL_FUNCTIONS);
-					ALL_IMPORTS   = ALL_IMPORTS.sort();
-					console.log("ALL Imports: ",  ALL_IMPORTS);
-					END_EXEC = new Date();
-					let DIFF = new Date(END_EXEC-START_EXEC);
-					console.log("Files processed: "+fileNum);
-					console.log("Lines processed: "+lines);
-					console.log("Timing: "+DIFF.getMinutes()+"m "+DIFF.getSeconds()+"s "+DIFF.getMilliseconds()+"ms");
+          printStats();
 				});
 			}else{
 				// If directory argument and file argument is passed
 				if(process.argv[3].includes(".")){
 					let fileList = createDirectoryTree(process.argv[2]);
-					//console.log(fileList);
+					//permLog(fileList);
 					let target = fileList.filter(file => file.includes(process.argv[3]));
 					if(target.length === 0){
-						console.log("Target file not found in directory");
+						permLog("Target file not found in directory");
 					}else{
 						processFile("../src/output/",target[0],()=>{
-							printFunctions(ALL_FUNCTIONS);
-							ALL_IMPORTS   = ALL_IMPORTS.sort();
-							console.log("ALL Imports: ",  ALL_IMPORTS);
-							END_EXEC = new Date();
-							let DIFF = new Date(END_EXEC-START_EXEC);
-							console.log("Lines processed: "+lines);
-							console.log("Timing: "+DIFF.getMinutes()+"m "+DIFF.getSeconds()+"s "+DIFF.getMilliseconds()+"ms");
+              printStats();
 						});
 					}
 				}else{
