@@ -22,6 +22,7 @@ const TokenType = {
   SCOPE        : "scope",
   ARGS         : "args",
   ARRAY        : "array",
+  ARRAYOBJ     : "arrayobj",
   LOGIC        : "logic",
   MUL          : "mul",
   DIV          : "div",
@@ -78,6 +79,7 @@ class Token{
 		this.type         = type;
 		this.word         = word;
     this.uncaptured   = uncaptured;
+    this.uncollapsed  = true;
 		this.args         = args;
 		this.linenum      = linenum;
 	}
@@ -294,8 +296,9 @@ function scopeparse(tree, filename){
 				if (tree[i].word === "]")
 					subTokens = new Token(TokenType.ARRAY, "", []);
 				if (subTokens !== null) {
-					for (let k = scopeStack[scopeStack.length-1] + 1; k < i; k++) {
-						subTokens.args.push(tree[k]);
+          let start = scopeStack[scopeStack.length-1] + 1;
+					for (let k = start; k < i; k++) {
+            subTokens.args.push(tree[k]);
 					}
 					let removeCount = i - scopeStack[scopeStack.length-1] + 1;
 					tree.splice(scopeStack[scopeStack.length-1], removeCount, subTokens);
@@ -440,6 +443,12 @@ function compoundScopes(tree, parentNode, index, filename){
     if(tree[i].uncaptured && tree[i].word === "*" && isKeyword(tree[i-1])){
       let subTokens = new Token(TokenType.POINTER, tree[i].word, [new Token(), tree[i+1]], tree[i+1].linenum, TokenType.CAPTURED);
       tree.splice(i,2,subTokens);
+      i -= (i === 0 ? 1 : 2);
+			continue;
+    }
+    if(tree[i].uncaptured && tree[i].type === TokenType.ARRAY){
+      let subTokens = new Token(TokenType.ARRAYOBJ, "", [tree[i-1], tree[i]], tree[i].linenum, TokenType.CAPTURED);
+      tree.splice(i-1,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
     }
@@ -601,7 +610,7 @@ function checkCollapse(token){
           token.type === TokenType.SCOPE        ||
           token.type === TokenType.ARGS         ||
           token.type === TokenType.ARRAY        ||
-          token.type === TokenType.ARRAYOB      ||
+          token.type === TokenType.ARRAYOBJ     ||
           token.type === TokenType.LOGIC        ||
           token.type === TokenType.INCREMENT    ||
           token.type === TokenType.DECREMENT    ||
@@ -636,6 +645,7 @@ function binaryOperation(token){
           token.type === TokenType.SUB          ||
           token.type === TokenType.DIV          ||
           token.type === TokenType.MUL          ||
+          token.type === TokenType.ARRAYOBJ     ||
           token.type === TokenType.ADDEQUALS    ||
           token.type === TokenType.SUBEQUALS    ||
           token.type === TokenType.DIVEQUALS    ||
@@ -670,6 +680,7 @@ function addSpace(token){
       token.type === TokenType.POINTER          ||
       token.type === TokenType.SEMICOLON        ||
       token.type === TokenType.ARRAY            ||
+      token.type === TokenType.ARRAYOBJ         ||
       token.type === TokenType.NEWLINE
   )
   return false;
@@ -711,38 +722,40 @@ function collapseTree(tree, filename, startIn, endIn){
 				collapseTree(tree[i].args, filename);
 			}
 		}
-    if(binaryOperation(tree[i]) && tree[i].args.length > 0){
-      tree[i].type == TokenType.COLLAPSE;
+    if(tree[i].uncollapsed && binaryOperation(tree[i]) && tree[i].args.length > 0){
+      tree[i].uncollapsed = false;
       let operation = tree[i].word;
       tree[i].word = "";
       tree[i].word += (tree[i].args[0] == null) ? "" : tree[i].args[0].word;
-      if(addSpace(tree[i])) tree[i].word += " ";
+      if(addSpace(tree[i]) || 
+      tree[i].type === TokenType.POINTER) tree[i].word += " ";
       tree[i].word += operation;
       if(addSpace(tree[i])) tree[i].word += " ";
       tree[i].word += (tree[i].args[1] == null) ? "" : tree[i].args[1].word;
       tree[i].args = [];
-		}else if(tree[i].type === TokenType.FUNCTIONCALL){
-			if(tree[i].args[0] == null){
+		}else if(tree[i].uncollapsed && tree[i].type === TokenType.FUNCTIONCALL){
+			tree[i].uncollapsed = false;
+      if(tree[i].args[0] == null){
 				permLog("Error in functioncall collapse in: ",filename);
 				permLog(tree[i]);
 			}
 			// Collapse function call
-			tree[i].type = TokenType.COLLAPSE;
 			tree[i].word += tree[i].args[0].word;
 			if(tree[i].args.length > 1){
 				tree[i].word += tree[i].args[1].word;
 			}
 			tree[i].args = [];
-		}else if(tree[i].type === TokenType.FUNCTIONDECL){
-			// Collapse function declaration
-			tree[i].type = TokenType.COLLAPSE;
+		}else if(tree[i].uncollapsed && tree[i].type === TokenType.FUNCTIONDECL){
+			tree[i].uncollapsed = false;
+      // Collapse function declaration
 			tree[i].word = "def "+tree[i].word;
 			tree[i].word += tree[i].args[0].word;
 			if(tree[i].args.length > 1){
 				tree[i].word += tree[i].args[1].word;
 			}
 			tree[i].args = [];
-		}else	if(tree[i].type === TokenType.SCOPE){
+		}else	if(tree[i].uncollapsed && tree[i].type === TokenType.SCOPE){
+      tree[i].uncollapsed = false;
 			if(tree[i].args.length !== 0) {
 				let empty = true;
 				// Collapse scope
@@ -758,29 +771,26 @@ function collapseTree(tree, filename, startIn, endIn){
           }
 				}
 				tree[i].word += "}";
-
 				// If scope is completely empty remove it
 				if(empty)
 					tree[i].word = "";
-
-				tree[i].type = TokenType.COLLAPSE;
 				tree[i].args = [];
 			}else{
-				tree[i].type = TokenType.COLLAPSE;
 				tree[i].word = "";
 				tree[i].args = [];
 			}
-		}else	if(tree[i].type === TokenType.ARRAY){
+		}else	if(tree[i].uncollapsed && tree[i].type === TokenType.ARRAY){
+      tree[i].uncollapsed = false;
 			// Collapse array
 			tree[i].word = "[";
 			for(let j=0;j<tree[i].args.length;j++){
 				tree[i].word += tree[i].args[j].word;
 			}
 			tree[i].word += "]";
-			tree[i].type = TokenType.COLLAPSE;
 			tree[i].args = [];
-		}else	if(tree[i].type === TokenType.ARGS){
-			// Collapse arguments
+		}else	if(tree[i].uncollapsed && tree[i].type === TokenType.ARGS){
+			tree[i].uncollapsed = false;
+      // Collapse arguments
 			tree[i].word = "(";
 			for(let j=0;j<tree[i].args.length;j++){
         
@@ -791,7 +801,6 @@ function collapseTree(tree, filename, startIn, endIn){
 				tree[i].word += tree[i].args[j].word;
 			}
 			tree[i].word += ")";
-			tree[i].type = TokenType.COLLAPSE;
 			tree[i].args = [];
 		}/*else{
 			// Default to concatenating everything
@@ -890,7 +899,7 @@ function processFile(outputDirectory,filepath,callback){
 		compoundScopes(tokens, null, null, filepath);
     divmulparse(tokens, filepath);
 		addsubparse(tokens, filepath);
-    console.dir(tokens,{depth:null});
+    //console.dir(tokens,{depth:null});
     collapseTree(tokens, filepath);
     filepath = replaceAll(filepath,"\\","/");
     let pathList  = filepath.split("/");

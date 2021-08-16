@@ -1,7 +1,6 @@
-for(int i = 0; i < GOTO_MEMORY; i++){
-if(jmp.l [i] == *c){
-jmp.i = i;
-changed = true;
-break;
-}
-}
+struct gotoExpressions
+{
+char *a[GOTO_MEMORY];
+char l[GOTO_MEMORY];
+int i;
+};
