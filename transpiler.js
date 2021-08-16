@@ -440,7 +440,8 @@ function compoundScopes(tree, parentNode, index, filename){
     if(tree[i].uncaptured && tree[i].word === "*" && isKeyword(tree[i-1])){
       let subTokens = new Token(TokenType.POINTER, tree[i].word, [new Token(), tree[i+1]], tree[i+1].linenum, TokenType.CAPTURED);
       tree.splice(i,2,subTokens);
-      i--;
+      i -= (i === 0 ? 1 : 2);
+			continue;
     }
   }
   // Fourth pass
@@ -600,6 +601,7 @@ function checkCollapse(token){
           token.type === TokenType.SCOPE        ||
           token.type === TokenType.ARGS         ||
           token.type === TokenType.ARRAY        ||
+          token.type === TokenType.ARRAYOB      ||
           token.type === TokenType.LOGIC        ||
           token.type === TokenType.INCREMENT    ||
           token.type === TokenType.DECREMENT    ||
@@ -667,6 +669,7 @@ function addSpace(token){
       token.type === TokenType.DECREMENT        ||
       token.type === TokenType.POINTER          ||
       token.type === TokenType.SEMICOLON        ||
+      token.type === TokenType.ARRAY            ||
       token.type === TokenType.NEWLINE
   )
   return false;
@@ -837,11 +840,12 @@ function saveTree(outputDirectory,filename,filecontents,callback){
 function flatten(tree){
 	let flattened = "";
 	for(let i=0;i<tree.length;i++){
-    if(tree[i-1] != null && tree[i] != null 
-    && tree[i-1].type !== TokenType.NEWLINE  
-    && tree[i].type !== TokenType.NEWLINE
-    && tree[i].type !== TokenType.SEMICOLON
-    && tree[i].type !== TokenType.COMMA)
+    if( tree[i-1]      != null                && 
+        tree[i-1].type != TokenType.NEWLINE   &&
+        tree[i].type   != TokenType.NEWLINE   &&
+        tree[i].type   != TokenType.COMMA     &&
+        tree[i].type   != TokenType.SEMICOLON
+        )
       flattened += " ";
 		flattened += tree[i].word;
 	}
@@ -886,8 +890,8 @@ function processFile(outputDirectory,filepath,callback){
 		compoundScopes(tokens, null, null, filepath);
     divmulparse(tokens, filepath);
 		addsubparse(tokens, filepath);
+    console.dir(tokens,{depth:null});
     collapseTree(tokens, filepath);
-		//console.dir(tokens,{depth:null});
     filepath = replaceAll(filepath,"\\","/");
     let pathList  = filepath.split("/");
     let filename  = pathList.pop();
