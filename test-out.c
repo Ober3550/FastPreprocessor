@@ -20,7 +20,7 @@ string a;// array
 struct gotoExpressions
 {
 char *a[GOTO_MEMORY];
-charl[GOTO_MEMORY];
+char l[GOTO_MEMORY];
 int i;
 };
 
@@ -32,15 +32,15 @@ sap out, in;
 
 // meta functions
 
-int strLength(const char  *str){
+int strLength(const char *str){
 int length = 0;
 
-while( *str++)length++;
+while(*str++) length++;
 
 return length;
 }
 
-bool compareString(char  *str0, char  *str1){
+bool compareString(char *str0, char *str1){
 int length;
 
 if((length = strLength(str0)) != strLength (str1)){
@@ -48,7 +48,7 @@ return false;
 }
 
 for(int i = 0; i < length; i++){
-if( *str0++ !=  *str1++) return false;
+if(*str0++ != *str1++) return false;
 }
 
 return true;
@@ -56,7 +56,7 @@ return true;
 
 // the main program
 
-void interpret(char  *c, int argc){
+void interpret(char *c, int argc){
 char *d;// for assigning c to when the [] loop is activated on lines 43 - 60
 int base = 1;// goto the ^ and v cases for info vvvvv
 int comments = false;// a boolean, true when comments are active and false when they're not
@@ -73,9 +73,9 @@ jmp.a[jmp.i] = 0;
 
 jmp.i = 0;
 
-while( *c){
+while(*c){
 if(!comments){
-switch(o = 1,  *c++){
+switch(o = 1, *c++){
 // added stuff
 case '|' : comments = true;break;// adds commenting properly as: code here|comment here|code here
 case '*' : out.a[out.i] = out.a[out.i + 1];break;// multiplies current cell by its upper neighbour
@@ -98,12 +98,12 @@ puts("CAN'T DIVIDE BY ZERO");
 return;
 }
 break;
-case '#' : out.a[out.i] =  *c;break;// makes the current cell = the next character as a char value (syntax for making cell = #d)
+case '#' : out.a[out.i] = *c;break;// makes the current cell = the next character as a char value (syntax for making cell = #d)
 case '^' : base++;break;// increases the base
-case 'v' : if(base > 1)base--;break;// decreases the base if is larger than one
+case 'v' : if(base > 1) base--;break;// decreases the base if is larger than one
 case '{' : 
  jmp.a[jmp.i] = c;
-jmp.l[jmp.i] =  *c;
+jmp.l[jmp.i] = *c;
 jmp.i++;
 break;
 case '}' : 
@@ -114,10 +114,10 @@ puts("CAN'T FIND LABEL");
 return;
 }
 
- *c++;
+*c++;
 
 for(int i = 0; i < GOTO_MEMORY; i++){
-if(jmp.l[i] ==  *c){
+if(jmp.l[i] == *c){
 jmp.i = i;
 changed = true;
 break;
@@ -129,7 +129,7 @@ puts("CAN'T FIND LABEL");
 return;
 }
 
- *c--;
+*c--;
 
 if(out.a[out.i] != 0) // checking value of current cell
 {
@@ -142,7 +142,7 @@ break;
 
 // original BrainFuck
 case '<' : 
- if(out.i > 0)out.i--;
+ if(out.i > 0) out.i--;
 else
 {
 puts("POINTER IS NEGATIVE");
@@ -155,8 +155,8 @@ case '-' : out.a[out.i] -= base;break;
 case '.' : putchar(out.a[out.i]);break;
 case ',' : out.a[out.i] = getchar();break;
 case '[' : 
- for(b = 1, d = c; b &&  *c; c++){
-b +=  *c == '[' , b -=  *c == ']';
+ for(b = 1, d = c; b && *c; c++){
+b += *c == '[' , b -= *c == ']';
 }
 
 if(!b){
@@ -175,7 +175,7 @@ return;
 default : o = 0;
 }
 }
-else if( *c++ == '|'){
+else if(*c++ == '|'){
 comments = !comments;
 }
 
@@ -186,7 +186,7 @@ return;
 }
 }
 
-int main(int argc, char  *argv[]){
+int main(int argc, char *argv[]){
 // initialising structs/new types
 in.p = in.a;
 in.i = 0;
@@ -194,8 +194,8 @@ in.i = 0;
 out.p = out.a;
 out.i = 0;
 
-char  *f = "-f";
-char  *i = "-i";
+char *f = "-f";
+char *i = "-i";
 
 if(compareString(argv[1], f)){
 // // for interpreting programs as files
@@ -262,11 +262,11 @@ for(int i = 1; i < argc; i++) // iterating through each argument seperated by sp
 {
 for(int j = 0; j < strLength(argv[i]); j++) // iterating through each char
 {
- *in.p++ = (char) ((argv[i])[j]);// assigning character to in[] and increment the pointer
+*in.p++ = (char) ((argv[i])[j]);// assigning character to in[] and increment the pointer
 }
-if(i < argc)  *in.p++ = ' ';// adding in spaces based on argc and i
+if(i < argc) *in.p++ = ' ';// adding in spaces based on argc and i
 }
- *in.p = 0;
+*in.p = 0;
 interpret(in.a, argc);
 }
 return 0;////////// EXIT

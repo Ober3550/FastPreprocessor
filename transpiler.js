@@ -669,7 +669,7 @@ function checkComma(token){
           token.type === TokenType.MULTICOMMENT;
 }
 
-function addSpace(token){
+function addSpaceBinary(token){
   if(token == null)
     return false;
   if( token.type === TokenType.ACCESSOR         ||
@@ -681,6 +681,18 @@ function addSpace(token){
       token.type === TokenType.SEMICOLON        ||
       token.type === TokenType.ARRAY            ||
       token.type === TokenType.ARRAYOBJ         ||
+      token.type === TokenType.NEWLINE
+  )
+  return false;
+  return true;
+}
+
+function addSpaceScope(token){
+  if(token == null)
+    return false;
+  if( token.type === TokenType.ACCESSOR         ||
+      token.type === TokenType.NONE             ||
+      token.type === TokenType.SEMICOLON        ||
       token.type === TokenType.NEWLINE
   )
   return false;
@@ -727,10 +739,9 @@ function collapseTree(tree, filename, startIn, endIn){
       let operation = tree[i].word;
       tree[i].word = "";
       tree[i].word += (tree[i].args[0] == null) ? "" : tree[i].args[0].word;
-      if(addSpace(tree[i]) || 
-      tree[i].type === TokenType.POINTER) tree[i].word += " ";
+      if(addSpaceBinary(tree[i])) tree[i].word += " ";
       tree[i].word += operation;
-      if(addSpace(tree[i])) tree[i].word += " ";
+      if(addSpaceBinary(tree[i])) tree[i].word += " ";
       tree[i].word += (tree[i].args[1] == null) ? "" : tree[i].args[1].word;
       tree[i].args = [];
 		}else if(tree[i].uncollapsed && tree[i].type === TokenType.FUNCTIONCALL){
@@ -766,7 +777,7 @@ function collapseTree(tree, filename, startIn, endIn){
 					if(empty && tree[i].args[j].word.length > 0 && tree[i].args[j].type !== TokenType.NEWLINE)
 						empty = false;
 					tree[i].word += tree[i].args[j].word;
-          if(addSpace(tree[i].args[j]) && addSpace(tree[i].args[j+1])){
+          if(addSpaceScope(tree[i].args[j]) && addSpaceScope(tree[i].args[j+1])){
             tree[i].word += " ";
           }
 				}
