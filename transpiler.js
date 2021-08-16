@@ -635,7 +635,8 @@ function collapseTree(tree, filename, startIn, endIn){
 				collapseTree(tree[i].args, filename);
 			}
 		}
-    if(binaryOperation(tree[i])){
+    if(binaryOperation(tree[i]) && tree[i].args.length > 0){
+      console.log(tree[i]);
       tree[i].type == TokenType.COLLAPSE;
       let operation = tree[i].word;
       tree[i].word = "";
@@ -707,14 +708,10 @@ function collapseTree(tree, filename, startIn, endIn){
 			// Collapse arguments
 			tree[i].word = "(";
 			for(let j=0;j<tree[i].args.length;j++){
-				// If element is a property add quotes around it
-				if(tree[i].args[j].type === "property")
-					tree[i].args[j].word = '"' + tree[i].args[j].word + '"';
-
 				// Add the variable to the args collapse
 				tree[i].word += tree[i].args[j].word;
 
-        if(j<tree[i].args.length-1)
+        if(addSpace(tree[i].args[j+1]) && j<tree[i].args.length-1)
           tree[i].word += " ";
 			}
 			tree[i].word += ")";
