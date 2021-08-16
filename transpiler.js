@@ -134,7 +134,7 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 			while(i < line.length){
 				multilineToken.word += line[i];
 				// Check that starting quote type (',") matches closing type
-				if(line[i] === multilineToken.stringType && line[i-1] !== "\\") {
+				if(line[i] === multilineToken.stringType && (line[i-1] !== "\\" || line[i-2] === "\\")) {
           closedMultiline = true;
           break;
 				}
@@ -158,8 +158,8 @@ function tokenize(line, tokens, multilineToken, filename, linenum){
 		  if(line[i] === '"' || line[i] === "'"){
 				// Move handling to multiline code
 				// (reduces duplicate code by having both single and multiline strings handled in same way)
-				multilineToken.word += line[i];
-				multilineToken.type = TokenType.STRING;
+				multilineToken.word      += line[i];
+				multilineToken.type       = TokenType.STRING;
 				multilineToken.stringType = line[i];
 			}else if(line[i] === "/" && line[i+1] === "*"){
 				// Move handling to multiline code
@@ -398,7 +398,7 @@ function compoundScopes(tree, parentNode, index, filename){
     }
     // Decrement token
     if(tree[i].uncaptured && tree[i].word === "--"){
-      let subTokens = new Token(TokenType.DECREMENT,"--",[newToketree[i-1],new Token()], tree[i-1].linenum, TokenType.CAPTURED);
+      let subTokens = new Token(TokenType.DECREMENT,"--",[tree[i-1],new Token()], tree[i-1].linenum, TokenType.CAPTURED);
       tree.splice(i-1,2,subTokens);
       i -= (i === 0 ? 1 : 2);
 			continue;
