@@ -7,19 +7,23 @@
 #define GOTO_MEMORY 20
 
 // type definitions and struct
-typedef enum { false, true} bool; // making an enum for booleans, better than macros
+typedef enum
+{
+	false,
+	true
+} bool; // making an enum for booleans, better than macros
 typedef char string[PROGRAM_MEMORY];
 
 struct stringAndPointer
 {
-	int i; // position in array
-	char * p; // pointer to array 
+	int i;		// position in array
+	char *p;	// pointer to array
 	string a; // array
 };
 
 struct gotoExpressions
 {
-	char * a[GOTO_MEMORY];
+	char *a[GOTO_MEMORY];
 	char l[GOTO_MEMORY];
 	int i;
 };
@@ -32,11 +36,12 @@ sap out, in;
 
 // meta functions
 
-int strLength(const char *str) 
+int strLength(const char *str)
 {
 	int length = 0;
 
-	while (*str++) length++;
+	while (*str++)
+		length++;
 
 	return length;
 }
@@ -50,9 +55,10 @@ bool compareString(char *str0, char *str1)
 		return false;
 	}
 
-	for(int i = 0; i < length; i++)
+	for (int i = 0; i < length; i++)
 	{
-        	if(*str0++ != *str1++) return false;
+		if (*str0++ != *str1++)
+			return false;
 	}
 
 	return true;
@@ -62,22 +68,22 @@ bool compareString(char *str0, char *str1)
 
 void interpret(char *c, int argc)
 {
-	char *d; // for assigning c to when the [] loop is activated on lines 43 - 60
-	int base = 1; // goto the ^ and v cases for info vvvvv
+	char *d;							// for assigning c to when the [] loop is activated on lines 43 - 60
+	int base = 1;					// goto the ^ and v cases for info vvvvv
 	int comments = false; // a boolean, true when comments are active and false when they're not
-	
+
 	// storage of labels and other related data
 	struct gotoExpressions jmp;
 
 	int oldJmpI;
 	bool changed = false;
-	
-	for(jmp.i = 0; jmp.i < GOTO_MEMORY; jmp.i++)
+
+	for (jmp.i = 0; jmp.i < GOTO_MEMORY; jmp.i++)
 	{
 		jmp.a[jmp.i] = 0;
 	}
 
-	jmp.i = 0;
+	jmp.i=0;
 
 	while (*c)
 	{
@@ -86,39 +92,51 @@ void interpret(char *c, int argc)
 			switch (o = 1, *c++)
 			{
 			// added stuff
-			case '|': comments = true;			 			 break; // adds commenting properly as: code here|comment here|code here
-			case '*': out.a[out.i] *= out.a[out.i + 1]; 	 break; // multiplies current cell by its upper neighbour
-			case 'x': out.a[out.i] *= out.a[out.i - 1];		 break; // multiplies current cell by its lower neighbour
-			case '/':	// divides current cell by its upper neighbour
-				if((out.a[out.i] != 0)&&(out.a[out.i + 1] != 0)) 
+			case '|':
+				comments = true;
+				break; // adds commenting properly as: code here|comment here|code here
+			case '*':
+				out.a[out.i] *= out.a[out.i + 1];
+				break; // multiplies current cell by its upper neighbour
+			case 'x':
+				out.a[out.i] *= out.a[out.i - 1];
+				break;	// multiplies current cell by its lower neighbour
+			case '/': // divides current cell by its upper neighbour
+				if ((out.a[out.i] != 0) && (out.a[out.i + 1] != 0))
 					out.a[out.i] /= out.a[out.i + 1];
-				else 
+				else
 				{
 					puts("CAN'T DIVIDE BY ZERO");
 					return;
 				}
 				break;
-			case'\\':	// divides current cell by its lower neighbour
-				if((out.a[out.i] != 0)&&(out.a[out.i - 1] != 0))
-					out.a[out.i] /= out.a[out.i - 1];	
+			case '\\': // divides current cell by its lower neighbour
+				if ((out.a[out.i] != 0) && (out.a[out.i - 1] != 0))
+					out.a[out.i] /= out.a[out.i - 1];
 				else
-				{ 
+				{
 					puts("CAN'T DIVIDE BY ZERO");
-					return;	 
+					return;
 				}
 				break;
-			case '#': out.a[out.i] = *c; 			 		 break; // makes the current cell = the next character as a char value (syntax for making cell = #d)
-			case '^': base++;				 				 break; // increases the base
-			case 'v': if (base > 1) base--;			 		 break; // decreases the base if is larger than one
-			case '{': 
+			case '#':
+				out.a[out.i] = *c;
+				break; // makes the current cell = the next character as a char value (syntax for making cell = #d)
+			case'^':
+				base++; // increases the base
+			case'v':
+				if (base > 1)
+					base--;
+				break; // decreases the base if is larger than one
+			case'{':
 				jmp.a[jmp.i] = c;
 				jmp.l[jmp.i] = *c;
 				jmp.i++;
 				break;
-			case '}':
+			case'}':
 				oldJmpI = jmp.i--;
 
-				if(jmp.a[jmp.i] == 0)
+				if (jmp.a[jmp.i] == 0)
 				{
 					puts("CAN'T FIND LABEL");
 					return;
@@ -126,9 +144,9 @@ void interpret(char *c, int argc)
 
 				*c++;
 
-				for(int i = 0; i < GOTO_MEMORY;i++)
+				for (int i = 0; i < GOTO_MEMORY; i++)
 				{
-					if(jmp.l[i] == *c)
+					if (jmp.l[i] == *c)
 					{
 						jmp.i = i;
 						changed = true;
@@ -136,7 +154,7 @@ void interpret(char *c, int argc)
 					}
 				}
 
-				if(changed)
+				if (changed)
 				{
 					puts("CAN'T FIND LABEL");
 					return;
@@ -144,7 +162,7 @@ void interpret(char *c, int argc)
 
 				*c--;
 
-				if(out.a[out.i] != 0) // checking value of current cell
+				if (out.a[out.i] != 0) // checking value of current cell
 				{
 					c = jmp.a[jmp.i]; // moving pointer
 				}
@@ -152,21 +170,32 @@ void interpret(char *c, int argc)
 				jmp.i = oldJmpI; // putting jmp.i back the way it was
 				changed = false;
 				break;
-			
+
 			// original BrainFuck
-			case '<': 
-				if (out.i > 0) out.i--;
+			case '<':
+				if (out.i > 0)
+					out.i--;
 				else
 				{
 					puts("POINTER IS NEGATIVE");
 					return;
 				}
 				break;
-			case '>': out.i++;                                break;
-			case '+': out.a[out.i] += base;			 break;
-			case '-': out.a[out.i] -= base;			 break;
-			case '.': putchar(out.a[out.i]); break;
-			case ',': out.a[out.i] = getchar(); break;
+			case '>':
+				out.i++;
+				break;
+			case '+':
+				out.a[out.i] += base;
+				break;
+			case '-':
+				out.a[out.i] -= base;
+				break;
+			case '.':
+				putchar(out.a[out.i]);
+				break;
+			case ',':
+				out.a[out.i] = getchar();
+				break;
 			case '[':
 				for (b = 1, d = c; b && *c; c++)
 				{
@@ -188,7 +217,8 @@ void interpret(char *c, int argc)
 			case ']':
 				puts("UNBALANCED BRACKETS");
 				return;
-			default: o = 0;
+			default:
+				o = 0;
 			}
 		}
 		else if (*c++ == '|')
@@ -196,7 +226,7 @@ void interpret(char *c, int argc)
 			comments = !comments;
 		}
 
-		if (out.i < 0 || out.i>100)
+		if (out.i < 0 || out.i > 100)
 		{
 			puts("RANGE ERROR");
 			return;
@@ -213,8 +243,8 @@ int main(int argc, char *argv[])
 	out.p = out.a;
 	out.i = 0;
 
-	char * f = "-f";
-	char * i = "-i";
+	char *f = "-f";
+	char *i = "-i";
 
 	if (compareString(argv[1], f))
 	{
@@ -236,7 +266,7 @@ int main(int argc, char *argv[])
 	{
 		// // message used to explain use
 		// printf("Write your program, character by character, using enter to interpret it as you need to.\n\n");
-		
+
 		// // initialising variable
 		// char command;
 
@@ -248,9 +278,8 @@ int main(int argc, char *argv[])
 		// {
 		// 	*in.p++ = command;
 		// }
-		
+
 		// printf("Would you like to interpret the program (press y for yes, n for no, e for exit)\n");
-		
 
 		// // goes back here if wrong input
 		// // if yes the program is interpreted
@@ -267,7 +296,7 @@ int main(int argc, char *argv[])
 		// }
 		// else if (command == 'e')
 		// {
-		// 	printf("exiting\n");	
+		// 	printf("exiting\n");
 		// }
 		// else
 		// {
@@ -285,7 +314,8 @@ int main(int argc, char *argv[])
 			{
 				*in.p++ = (char)((argv[i])[j]); // assigning character to in[] and increment the pointer
 			}
-			if(i < argc) *in.p++ = ' '; // adding in spaces based on argc and i
+			if (i < argc)
+				*in.p++ = ' '; // adding in spaces based on argc and i
 		}
 		*in.p = 0;
 		interpret(in.a, argc);
